@@ -10,6 +10,7 @@ from logHandler import log
 from ..common.exceptions import EngineError, ResponseParsingError
 from ..common.network import send_request
 from ..common.text_utils import split_text
+from ..common.cues import beep
 
 addonHandler.initTranslation()
 
@@ -240,11 +241,13 @@ class BaseHttpEngine(TranslationEngine):
 		limit = self.max_request_length
 		if limit <= 0 or len(text) <= limit:
 			return self._translate_chunk(text, lang_from, lang_to, config)
+		
 		chunks = split_text(text, limit)
+		total_chunks = len(chunks)
 		
 		translated_chunks = []
 		detected_lang = None
-		for chunk in chunks:
+		for i, chunk in enumerate(chunks):
 			if not chunk.strip():
 				translated_chunks.append(chunk)
 				continue
@@ -265,6 +268,9 @@ class BaseHttpEngine(TranslationEngine):
 			
 			translated_chunks.append(leading_str + translated_text + trailing_str)
 			
+			if total_chunks > 1:
+				beep.play_progress(i + 1, total_chunks)
+
 			if detected_lang is None and "lang_detected" in res:
 				detected_lang = res["lang_detected"]
 		

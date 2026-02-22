@@ -131,6 +131,23 @@ class beep:
 		cue_function = lambda: beep.play(event_name)
 		_start_periodic_cue_internal(cue_function, interval_ms, delay_ms)
 
+	@staticmethod
+	def play_progress(current: int, total: int) -> None:
+		"""
+		Plays a dynamic pitch beep based on progress.
+		The pitch rises exponentially as the task nears completion,
+		matching NVDA's native progress bar beep range (110Hz to 1760Hz).
+		"""
+		if total <= 1:
+			return
+		# Clamp current value to range [1, total]
+		current = max(1, min(current, total))
+		progress = current / total
+		# NVDA's native progress bar range: 4 octaves starting from 110Hz
+		# Formula: 110 * (2 ^ (progress * 4))
+		freq = int(110 * (2 ** (progress * 4)))
+		tones.beep(freq, 40)
+
 
 class speech:
 	"""A namespace for all speech-based cues."""
