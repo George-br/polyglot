@@ -154,22 +154,22 @@ ALL_LANGUAGES = {
 }
 
 
-def get_language_dict_for_codes(codes: list[str]) -> dict[str, str]:
+def getLanguageDictForCodes(codes: list[str]) -> dict[str, str]:
 	"""
 	Builds a language dictionary for a specific engine.
 	If a code is not found in the central repository, it logs an error
 	and uses the code itself as the display name as a fallback.
-	@param codes: A list of language codes supported by the engine.
-	@return: A dictionary mapping the supported codes to their display names.
+	:param codes: A list of language codes supported by the engine.
+	:return: A dictionary mapping the supported codes to their display names.
 	"""
-	lang_dict: dict[str, str] = {}
+	langDict: dict[str, str] = {}
 	for code in codes:
 		if code in ALL_LANGUAGES:
-			lang_dict[code] = ALL_LANGUAGES[code]
+			langDict[code] = ALL_LANGUAGES[code]
 		else:
 			# Log an error for missing definitions and use the code as a fallback display name.
 			log.error(
 				f"Language code '{code}' not found in central repository. Using the code as its display name."
 			)
-			lang_dict[code] = code
-	return lang_dict
+			langDict[code] = code
+	return langDict

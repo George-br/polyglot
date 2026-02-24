@@ -9,104 +9,104 @@ from logHandler import log
 
 from ..common.cache import TranslationCache
 from ..common.exceptions import EngineError
-from ..services import engine_manager
+from ..services import engineManager
 
 
 class TranslationTask(threading.Thread):
 	# Annotating instance variables at the class level
-	engine_id: str
+	engineId: str
 	text: str
-	lang_from: str
-	lang_to: str
+	langFrom: str
+	langTo: str
 	cache: TranslationCache
-	on_complete: Callable[[dict[str, Any]], None]
-	is_manual: bool
-	engine_config: dict[str, Any]
-	_is_cancelled: bool
+	onComplete: Callable[[dict[str, Any]], None]
+	isManual: bool
+	engineConfig: dict[str, Any]
+	_isCancelled: bool
 	_lock: threading.Lock
 
 	def __init__(
 		self,
-		engine_id: str,
+		engineId: str,
 		text: str,
-		lang_from: str,
-		lang_to: str,
+		langFrom: str,
+		langTo: str,
 		cache: TranslationCache,
-		on_complete: Callable[[dict[str, Any]], None],
-		is_manual: bool,
-		engine_config: dict[str, Any],
+		onComplete: Callable[[dict[str, Any]], None],
+		isManual: bool,
+		engineConfig: dict[str, Any],
 	) -> None:
 		super().__init__(daemon=True)
-		self.engine_id = engine_id
+		self.engineId = engineId
 		self.text = text
-		self.lang_from = lang_from
-		self.lang_to = lang_to
+		self.langFrom = langFrom
+		self.langTo = langTo
 		self.cache = cache
-		self.on_complete = on_complete
-		self.is_manual = is_manual
-		self.engine_config = engine_config
-		self._is_cancelled = False
+		self.onComplete = onComplete
+		self.isManual = isManual
+		self.engineConfig = engineConfig
+		self._isCancelled = False
 		self._lock = threading.Lock()
-		log.debug(f"TranslationTask created for engine '{self.engine_id}', is_manual={self.is_manual}.")
+		log.debug(f"TranslationTask created for engine '{self.engineId}', isManual={self.isManual}.")
 
 	def cancel(self) -> None:
 		with self._lock:
 			log.info(f"Cancelling translation task for text: '{self.text[:50]}...'")
-			self._is_cancelled = True
+			self._isCancelled = True
 
-	def is_cancelled(self) -> bool:
+	def isCancelled(self) -> bool:
 		with self._lock:
-			return self._is_cancelled
+			return self._isCancelled
 
 	def run(self) -> None:
 		result: dict[str, str | Exception | None] = {"translation": None, "error": None}
 		try:
-			if self.is_cancelled():
+			if self.isCancelled():
 				return
-			engine = engine_manager.get_engine_by_id(self.engine_id)
-			engine_config = self.engine_config
-			auto_detect_code = engine.auto_detect_code
-			first_result = engine.translate(self.text, self.lang_from, self.lang_to, engine_config, is_cancelled=self.is_cancelled)
-			if self.is_cancelled():
+			engine = engineManager.getEngineById(self.engineId)
+			engineConfig = self.engineConfig
+			autoDetectCode = engine.autoDetectCode
+			firstResult = engine.translate(self.text, self.langFrom, self.langTo, engineConfig, isCancelled=self.isCancelled)
+			if self.isCancelled():
 				return
-			lang_detected = first_result.get("lang_detected")
-			result.update(first_result)
-			should_swap = (
-				self.is_manual
-				and engine_config.get("enableAutoSwap")
-				and self.lang_from == auto_detect_code
-				and lang_detected is not None
-				and lang_detected == self.lang_to
+			langDetected = firstResult.get("langDetected")
+			result.update(firstResult)
+			shouldSwap = (
+				self.isManual
+				and engineConfig.get("enableAutoSwap")
+				and self.langFrom == autoDetectCode
+				and langDetected is not None
+				and langDetected == self.langTo
 			)
-			final_target_lang = self.lang_to
-			if should_swap:
-				swap_lang = engine_config.get("swapLanguage")
-				if swap_lang and swap_lang != self.lang_to:
-					final_target_lang = swap_lang
-					assert lang_detected is not None
-					second_result = engine.translate(self.text, lang_detected, swap_lang, engine_config, is_cancelled=self.is_cancelled)
-					if self.is_cancelled():
+			finalTargetLang = self.langTo
+			if shouldSwap:
+				swapLang = engineConfig.get("swapLanguage")
+				if swapLang and swapLang != self.langTo:
+					finalTargetLang = swapLang
+					assert langDetected is not None
+					secondResult = engine.translate(self.text, langDetected, swapLang, engineConfig, isCancelled=self.isCancelled)
+					if self.isCancelled():
 						return
-					result.update(second_result)
-			final_translation = result.get("translation")
-			if final_translation and isinstance(final_translation, str):
-				source_lang_for_cache = lang_detected or self.lang_from
-				if source_lang_for_cache != auto_detect_code:
-					if isinstance(source_lang_for_cache, str):
-						specific_key = self.cache.build_key(
-							source_lang_for_cache, final_target_lang, self.text
+					result.update(secondResult)
+			finalTranslation = result.get("translation")
+			if finalTranslation and isinstance(finalTranslation, str):
+				sourceLangForCache = langDetected or self.langFrom
+				if sourceLangForCache != autoDetectCode:
+					if isinstance(sourceLangForCache, str):
+						specificKey = self.cache.buildKey(
+							sourceLangForCache, finalTargetLang, self.text
 						)
-						self.cache.set(specific_key, final_translation)
-				if self.lang_from == auto_detect_code:
-					# Fix: Ensure `auto_detect_code` is a string before passing it to `build_key`.
-					# This handles cases where an engine might not support auto-detection (`auto_detect_code` is None).
-					if isinstance(auto_detect_code, str):
-						auto_key = self.cache.build_key(auto_detect_code, self.lang_to, self.text)
-						self.cache.set(auto_key, final_translation)
+						self.cache.set(specificKey, finalTranslation)
+				if self.langFrom == autoDetectCode:
+					# Fix: Ensure `autoDetectCode` is a string before passing it to `buildKey`.
+					# This handles cases where an engine might not support auto-detection (`autoDetectCode` is None).
+					if isinstance(autoDetectCode, str):
+						autoKey = self.cache.buildKey(autoDetectCode, self.langTo, self.text)
+						self.cache.set(autoKey, finalTranslation)
 		except EngineError as e:
 			result["error"] = e
 		except Exception as e:
 			log.error("An unexpected error occurred inside TranslationTask.run.", exc_info=True)
 			result["error"] = e
-		if not self.is_cancelled():
-			self.on_complete(result)
+		if not self.isCancelled():
+			self.onComplete(result)

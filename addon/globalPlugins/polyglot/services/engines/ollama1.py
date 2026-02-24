@@ -2,7 +2,7 @@
 
 import addonHandler
 
-from .ollama_base import OllamaBaseEngine
+from .ollamaBase import OllamaBaseEngine
 
 addonHandler.initTranslation()
 
@@ -13,5 +13,5 @@ class OllamaTranslateEngine(OllamaBaseEngine):
 	It inherits all logic from the base engine and sets a unique ID and name.
 	"""
 
-	id = "ollama_1"
+	id = "ollama1"
 	name = _("Ollama 1")

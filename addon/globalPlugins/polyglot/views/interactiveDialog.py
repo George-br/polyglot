@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import wx
-import gui
 from gui import guiHelper
 import api
-import textInfos
 import addonHandler
-from logHandler import log
 from gui.nvdaControls import DPIScaledDialog
 
 from ..common import config
-from ..common import languages
-from ..services import engine_manager
+from ..services import engineManager
 
 addonHandler.initTranslation()
 
@@ -23,7 +19,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 	def __init__(self, parent, manager):
 		super().__init__(parent, title=_("Polyglot Interactive Translation"), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
 		self.manager = manager
-		self.allEngines = engine_manager.get_all_engines()
+		self.allEngines = engineManager.getAllEngines()
 		
 		# Internal state for dynamic choices
 		self._modeIds = []
@@ -90,7 +86,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		self.SetEscapeId(wx.ID_CLOSE)
 		
 		# Initialize engine selection
-		conf = config.get_config()
+		conf = config.getConfig()
 		currentEngineId = conf["engine"]
 		engineIndex = 0
 		for i, eng in enumerate(self.allEngines):
@@ -126,16 +122,16 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 
 	def updateEngineUI(self, event):
 		engine = self.getSelectedEngine()
-		conf = config.get_config()
+		conf = config.getConfig()
 		engineConf = conf["engines"].get(engine.id, {})
-		spec = engine.get_config_spec()
+		spec = engine.getConfigSpec()
 		
 		promptModes = {}
 		models = {}
 		for item in spec:
-			if item["id"] in ("promptMode", "prompt_mode"):
+			if item["id"] == "promptMode":
 				promptModes = item.get("choices", {}).copy()
-			elif item["id"] in ("modelNamePreset", "model_preset"):
+			elif item["id"] in ("modelNamePreset", "modelPreset"):
 				models = item.get("choices", {}).copy()
 		
 		if "custom" in models:
@@ -144,7 +140,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 				del models["custom"]
 			else:
 				# Translators: Label for custom model with its name.
-				models["custom"] = _("Custom: {model_name}").format(model_name=customName)
+				models["custom"] = _("Custom: {modelName}").format(modelName=customName)
 
 		isLLM = bool(promptModes)
 		self.advancedBox.Enable(isLLM)
@@ -177,15 +173,15 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 			self.promptModeCombo.SetItems([_("Not applicable")])
 			self.promptModeCombo.Disable()
 
-		supportedLangs = engine.get_supported_languages()
+		supportedLangs = engine.getSupportedLanguages()
 		sortedLangs = sorted(supportedLangs.items(), key=lambda x: x[1])
 		self._langCodes = [x[0] for x in sortedLangs]
 		langNames = [x[1] for x in sortedLangs]
 		self.sourceLangCombo.SetItems(langNames)
 		self.targetLangCombo.SetItems(langNames)
 		
-		defFrom = engineConf.get("langFrom", engine.default_source_language)
-		defTo = engineConf.get("langTo", engine.default_target_language)
+		defFrom = engineConf.get("langFrom", engine.defaultSourceLanguage)
+		defTo = engineConf.get("langTo", engine.defaultTargetLanguage)
 		try:
 			self.sourceLangCombo.SetSelection(self._langCodes.index(defFrom))
 		except ValueError:
@@ -210,7 +206,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		isCustom = (modeId == "custom")
 		
 		if isCustom:
-			conf = config.get_config()
+			conf = config.getConfig()
 			engineConf = conf["engines"].get(engine.id, {})
 			self.systemPromptCtrl.SetValue(engineConf.get("customSystemPrompt", ""))
 			self.userPromptCtrl.SetValue(engineConf.get("customUserPrompt", ""))
@@ -235,7 +231,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		langTo = self._langCodes[self.targetLangCombo.GetSelection()]
 		
 		# Sync all UI choices to global config
-		conf = config.get_config()
+		conf = config.getConfig()
 		if conf["engine"] != engine.id:
 			conf["engine"] = engine.id
 			
@@ -263,7 +259,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		def callback(resultText):
 			wx.CallAfter(self.onTranslationDone, resultText)
 
-		self.manager.request_translation(text, on_success=callback, show_status=True)
+		self.manager.requestTranslation(text, onSuccess=callback, showStatus=True)
 
 	def onTranslationDone(self, resultText):
 		self.translateBtn.Enable()

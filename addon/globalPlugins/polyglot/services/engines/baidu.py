@@ -41,19 +41,19 @@ class BaiduTranslateEngine(BaseHttpEngine):
 	}
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		return 6000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "zh"
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		# Add engine-specific settings.
 		spec.extend(
 			[
@@ -71,8 +71,8 @@ class BaiduTranslateEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"auto",
 			"zh",
 			"en",
@@ -103,29 +103,29 @@ class BaiduTranslateEngine(BaseHttpEngine):
 			"cht",
 			"vie",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def _make_sign(self, text, salt, app_id, app_secret):
-		sign_str = app_id + text + str(salt) + app_secret
-		return hashlib.md5(sign_str.encode("utf-8")).hexdigest()
+	def _makeSign(self, text, salt, appId, appSecret):
+		signStr = appId + text + str(salt) + appSecret
+		return hashlib.md5(signStr.encode("utf-8")).hexdigest()
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		app_id = config.get("appId")
-		app_secret = config.get("appSecret")
-		if not app_id or not app_secret:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		appId = config.get("appId")
+		appSecret = config.get("appSecret")
+		if not appId or not appSecret:
 			raise BaiduApiError(_("App ID and App Secret are required."))
 
 		salt = random.randint(32768, 65536)
-		sign = self._make_sign(text, salt, app_id, app_secret)
+		sign = self._makeSign(text, salt, appId, appSecret)
 
-		if lang_from in ("zh-CN", "zh-TW"):
-			lang_from = "zh"
-		if lang_to == "zh-CN":
-			lang_to = "zh"
-		if lang_to == "zh-TW":
-			lang_to = "cht"
+		if langFrom in ("zh-CN", "zh-TW"):
+			langFrom = "zh"
+		if langTo == "zh-CN":
+			langTo = "zh"
+		if langTo == "zh-TW":
+			langTo = "cht"
 
-		params = {"q": text, "from": lang_from, "to": lang_to, "appid": app_id, "salt": salt, "sign": sign}
+		params = {"q": text, "from": langFrom, "to": langTo, "appid": appId, "salt": salt, "sign": sign}
 		if config.get("useTermbase", False):
 			params["needIntervene"] = 1
 
@@ -136,15 +136,15 @@ class BaiduTranslateEngine(BaseHttpEngine):
 			"data": urllib.parse.urlencode(params).encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
-		result = json.loads(response_body)
+	def _parseResponse(self, responseBody: str) -> dict:
+		result = json.loads(responseBody)
 
 		if "error_code" in result:
-			error_code = result["error_code"]
-			message = self.ERROR_CODES.get(error_code, result.get("error_msg", _("Unknown API error")))
-			raise BaiduApiError(f"{message} (Code: {error_code})")
+			errorCode = result["error_code"]
+			message = self.ERROR_CODES.get(errorCode, result.get("error_msg", _("Unknown API error")))
+			raise BaiduApiError(f"{message} (Code: {errorCode})")
 
-		translated_text = "\n".join(item["dst"] for item in result["trans_result"])
-		detected_lang = result.get("from")
+		translatedText = "\n".join(item["dst"] for item in result["trans_result"])
+		detectedLang = result.get("from")
 
-		return {"translation": translated_text, "lang_detected": detected_lang}
+		return {"translation": translatedText, "langDetected": detectedLang}

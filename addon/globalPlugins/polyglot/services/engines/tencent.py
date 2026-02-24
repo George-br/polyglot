@@ -25,19 +25,19 @@ class TencentTranslateEngine(BaseHttpEngine):
 	name = _("Tencent Translate")
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		return 6000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "zh"
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"auto",
 			"zh",
 			"zh-TW",
@@ -58,10 +58,10 @@ class TencentTranslateEngine(BaseHttpEngine):
 			"ar",
 			"hi",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{"id": "secretId", "label": _("Secret ID"), "type": "text", "default": ""},
@@ -84,10 +84,10 @@ class TencentTranslateEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		secret_id = config.get("secretId")
-		secret_key = config.get("secretKey")
-		if not secret_id or not secret_key:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		secretId = config.get("secretId")
+		secretKey = config.get("secretKey")
+		if not secretId or not secretKey:
 			raise AuthenticationError(_("Secret ID and Secret Key must be provided."))
 
 		region = config.get("region", "ap-beijing")
@@ -100,41 +100,41 @@ class TencentTranslateEngine(BaseHttpEngine):
 
 		body = {
 			"SourceText": text,
-			"Source": lang_from,
-			"Target": lang_to,
+			"Source": langFrom,
+			"Target": langTo,
 			"ProjectId": 0,
 		}
-		payload_str = json.dumps(body)
-		hashed_request_payload = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
-		http_request_method = "POST"
-		canonical_uri = "/"
-		canonical_query_string = ""
-		canonical_headers = f"content-type:application/json\nhost:{endpoint}\n"
-		signed_headers = "content-type;host"
+		payloadStr = json.dumps(body)
+		hashedRequestPayload = hashlib.sha256(payloadStr.encode("utf-8")).hexdigest()
+		httpRequestMethod = "POST"
+		canonicalUri = "/"
+		canonicalQueryString = ""
+		canonicalHeaders = f"content-type:application/json\nhost:{endpoint}\n"
+		signedHeaders = "content-type;host"
 
-		canonical_request = (
-			f"{http_request_method}\n{canonical_uri}\n{canonical_query_string}\n"
-			f"{canonical_headers}\n{signed_headers}\n{hashed_request_payload}"
+		canonicalRequest = (
+			f"{httpRequestMethod}\n{canonicalUri}\n{canonicalQueryString}\n"
+			f"{canonicalHeaders}\n{signedHeaders}\n{hashedRequestPayload}"
 		)
 
 		algorithm = "TC3-HMAC-SHA256"
-		hashed_canonical_request = hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
-		credential_scope = f"{date}/{service}/tc3_request"
-		string_to_sign = f"{algorithm}\n{timestamp}\n{credential_scope}\n{hashed_canonical_request}"
+		hashedCanonicalRequest = hashlib.sha256(canonicalRequest.encode("utf-8")).hexdigest()
+		credentialScope = f"{date}/{service}/tc3_request"
+		stringToSign = f"{algorithm}\n{timestamp}\n{credentialScope}\n{hashedCanonicalRequest}"
 
-		def sha256_hmac(message, secret):
+		def sha256Hmac(message, secret):
 			return hmac.new(secret, message, digestmod=hashlib.sha256).digest()
 
-		secret_date = sha256_hmac(date.encode("utf-8"), ("TC3" + secret_key).encode("utf-8"))
-		secret_service = sha256_hmac(service.encode("utf-8"), secret_date)
-		secret_signing = sha256_hmac(b"tc3_request", secret_service)
+		secretDate = sha256Hmac(date.encode("utf-8"), ("TC3" + secretKey).encode("utf-8"))
+		secretService = sha256Hmac(service.encode("utf-8"), secretDate)
+		secretSigning = sha256Hmac(b"tc3_request", secretService)
 		signature = hmac.new(
-			secret_signing, string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
+			secretSigning, stringToSign.encode("utf-8"), digestmod=hashlib.sha256
 		).hexdigest()
 
 		authorization = (
-			f"{algorithm} Credential={secret_id}/{credential_scope}, "
-			f"SignedHeaders={signed_headers}, Signature={signature}"
+			f"{algorithm} Credential={secretId}/{credentialScope}, "
+			f"SignedHeaders={signedHeaders}, Signature={signature}"
 		)
 
 		headers = {
@@ -151,30 +151,30 @@ class TencentTranslateEngine(BaseHttpEngine):
 			"method": "POST",
 			"url": f"https://{endpoint}",
 			"headers": headers,
-			"data": payload_str.encode("utf-8"),
+			"data": payloadStr.encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
-		data = json.loads(response_body)
+	def _parseResponse(self, responseBody: str) -> dict:
+		data = json.loads(responseBody)
 		response = data.get("Response", {})
 
 		if "Error" in response and response["Error"]:
 			error = response["Error"]
-			error_code = error.get("Code", "N/A")
-			error_message = error.get("Message", _("Unknown API error"))
-			log.error(f"Tencent API Error: Code={error_code}, Message={error_message}")
+			errorCode = error.get("Code", "N/A")
+			errorMessage = error.get("Message", _("Unknown API error"))
+			log.error(f"Tencent API Error: Code={errorCode}, Message={errorMessage}")
 
-			if "AuthFailure" in error_code:
+			if "AuthFailure" in errorCode:
 				raise AuthenticationError(
-					f"{_('Authentication failed')}: {error_message} (Code: {error_code})"
+					f"{_('Authentication failed')}: {errorMessage} (Code: {errorCode})"
 				)
 			else:
-				raise TencentApiError(f"{error_message} (Code: {error_code})")
+				raise TencentApiError(f"{errorMessage} (Code: {errorCode})")
 
-		translated_text = response.get("TargetText")
-		detected_lang = response.get("Source")
+		translatedText = response.get("TargetText")
+		detectedLang = response.get("Source")
 
-		if translated_text is None:
+		if translatedText is None:
 			raise TencentApiError(_("Invalid API response or no translation result included."))
 
-		return {"translation": translated_text, "lang_detected": detected_lang}
+		return {"translation": translatedText, "langDetected": detectedLang}

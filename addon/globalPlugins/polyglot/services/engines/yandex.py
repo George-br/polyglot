@@ -29,7 +29,7 @@ class YandexTranslateEngine(BaseHttpEngine):
 	name = _("Yandex Translate")
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		"""
 		Empirical testing (EN->ZH) revealed a limit of 10,240 characters.
 		Because this engine uses 'application/x-www-form-urlencoded', non-ASCII characters
@@ -39,20 +39,20 @@ class YandexTranslateEngine(BaseHttpEngine):
 		return 5000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return ""
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "zh"
 
 	@property
-	def reports_detected_language(self) -> bool:
+	def reportsDetectedLanguage(self) -> bool:
 		# The API response does not include the detected source language.
 		return False
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"",
 			"zh",
 			"en",
@@ -79,52 +79,52 @@ class YandexTranslateEngine(BaseHttpEngine):
 			"uk",
 			"he",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def get_config_spec(self) -> list[dict]:
+	def getConfigSpec(self) -> list[dict]:
 		"""This engine does not require any specific configuration."""
-		return super().get_config_spec()
+		return super().getConfigSpec()
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
 		"""Builds the request dictionary for the Yandex API call."""
-		base_url = "https://translate.yandex.net/api/v1/tr.json/translate"
+		baseUrl = "https://translate.yandex.net/api/v1/tr.json/translate"
 
 		# Build query parameters for the URL
-		query_params = {
+		queryParams = {
 			"id": str(uuid.uuid4()).replace("-", "") + "-0-0",
 			"srv": "android",
 		}
-		full_url = f"{base_url}?{urllib.parse.urlencode(query_params)}"
+		fullUrl = f"{baseUrl}?{urllib.parse.urlencode(queryParams)}"
 
 		# Build the form data for the request body
-		form_data = {
-			"source_lang": lang_from,
-			"target_lang": lang_to,
+		formData = {
+			"source_lang": langFrom,
+			"target_lang": langTo,
 			"text": text,
 		}
 
 		return {
 			"method": "POST",
-			"url": full_url,
+			"url": fullUrl,
 			"headers": {"Content-Type": "application/x-www-form-urlencoded"},
-			"data": urllib.parse.urlencode(form_data).encode("utf-8"),
+			"data": urllib.parse.urlencode(formData).encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
+	def _parseResponse(self, responseBody: str) -> dict:
 		"""Parses the JSON response from the Yandex API."""
-		data = json.loads(response_body)
+		data = json.loads(responseBody)
 
-		translated_text_list = data.get("text")
+		translatedTextList = data.get("text")
 
-		if translated_text_list and isinstance(translated_text_list, list) and translated_text_list[0]:
+		if translatedTextList and isinstance(translatedTextList, list) and translatedTextList[0]:
 			return {
-				"translation": translated_text_list[0],
-				"lang_detected": None,  # API doesn't provide this
+				"translation": translatedTextList[0],
+				"langDetected": None,  # API doesn't provide this
 			}
 		else:
 			# Handle potential API errors if they are structured differently
-			error_code = data.get("code")
-			error_message = data.get("message", "Unknown API error")
-			if error_code:
-				raise YandexApiError(f"{error_message} (Code: {error_code})")
+			errorCode = data.get("code")
+			errorMessage = data.get("message", "Unknown API error")
+			if errorCode:
+				raise YandexApiError(f"{errorMessage} (Code: {errorCode})")
 			raise YandexApiError(_("Invalid API response or no translation result included."))

@@ -11,8 +11,8 @@ from logHandler import log
 
 from ..common.cache import TranslationCache
 from ..common import config
-from ..services import engine_manager
-from . import factory as ui_factory
+from ..services import engineManager
+from . import factory as uiFactory
 
 addonHandler.initTranslation()
 
@@ -23,250 +23,250 @@ class TranslationSettingsPanel(SettingsPanel):
 	# Annotate instance variables with their known types
 	engines: "OrderedDict[str, Any]"  # Forward reference because TranslationEngine is not imported
 	cache: TranslationCache
-	ui_model: dict[str, Any]
-	dynamic_controls: dict[str, dict[str, Any]]
-	engine_panels_cache: dict[str, wx.Panel]
+	uiModel: dict[str, Any]
+	dynamicControls: dict[str, dict[str, Any]]
+	enginePanelsCache: dict[str, wx.Panel]
 	# Allow these instance variables to be None, matching their initial assignment.
-	active_engine_panel: wx.Panel | None
-	_engine_switch_timer: wx.CallLater | None
+	activeEnginePanel: wx.Panel | None
+	_engineSwitchTimer: wx.CallLater | None
 
 	def __init__(self, parent):
-		self.engines = OrderedDict((e.id, e) for e in engine_manager.get_all_engines())
+		self.engines = OrderedDict((e.id, e) for e in engineManager.getAllEngines())
 		# TranslationCache is a singleton, so getting an instance here is safe
 		# and will access the same cache used by the manager.
 		self.cache = TranslationCache()
-		self.ui_model = {}
+		self.uiModel = {}
 
-		self.dynamic_controls = {}
-		self.engine_panels_cache = {}
-		self.active_engine_panel = None
+		self.dynamicControls = {}
+		self.enginePanelsCache = {}
+		self.activeEnginePanel = None
 
 		# --- DEBOUNCING STRATEGY: Timer for smooth engine switching ---
-		self._engine_switch_timer = None
+		self._engineSwitchTimer = None
 
 		super().__init__(parent)
-		self.Bind(wx.EVT_WINDOW_DESTROY, self._on_destroy)
+		self.Bind(wx.EVT_WINDOW_DESTROY, self._onDestroy)
 
 	def makeSettings(self, sizer):
 		sHelper = guiHelper.BoxSizerHelper(self, sizer=sizer)
 
-		self.engine_choice = sHelper.addLabeledControl(_("Translation &engine:"), wx.Choice)
+		self.engineChoice = sHelper.addLabeledControl(_("Translation &engine:"), wx.Choice)
 		_unused = sHelper.addItem(wx.StaticLine(self, style=wx.LI_HORIZONTAL))
 
-		self.engine_panel_container_sizer = wx.BoxSizer(wx.VERTICAL)
-		_unused = sHelper.addItem(self.engine_panel_container_sizer, proportion=1, flag=wx.EXPAND)
+		self.enginePanelContainerSizer = wx.BoxSizer(wx.VERTICAL)
+		_unused = sHelper.addItem(self.enginePanelContainerSizer, proportion=1, flag=wx.EXPAND)
 
 		_unused = sHelper.addItem(wx.StaticLine(self, style=wx.LI_HORIZONTAL))
 
-		common_box = wx.StaticBox(self, label=_("Common Settings"))
-		common_sizer = wx.StaticBoxSizer(common_box, wx.VERTICAL)
-		common_sHelper = guiHelper.BoxSizerHelper(self, sizer=common_sizer)
+		commonBox = wx.StaticBox(self, label=_("Common Settings"))
+		commonSizer = wx.StaticBoxSizer(commonBox, wx.VERTICAL)
+		commonSHelper = guiHelper.BoxSizerHelper(self, sizer=commonSizer)
 
-		self.copy_result_checkbox = common_sHelper.addItem(
+		self.copyResultCheckbox = commonSHelper.addItem(
 			wx.CheckBox(self, label=_("Copy manual translation results to clipboard"))
 		)
-		self.clear_cache_button = common_sHelper.addItem(wx.Button(self, label=_("Clear Cache")))
-		_unused = sHelper.addItem(common_sizer, flag=wx.EXPAND)
+		self.clearCacheButton = commonSHelper.addItem(wx.Button(self, label=_("Clear Cache")))
+		_unused = sHelper.addItem(commonSizer, flag=wx.EXPAND)
 
-		self.engine_choice.Bind(wx.EVT_CHOICE, self.on_engine_changed)
-		self.copy_result_checkbox.Bind(wx.EVT_CHECKBOX, self.on_any_control_changed)
-		self.clear_cache_button.Bind(wx.EVT_BUTTON, self.on_clear_cache)
+		self.engineChoice.Bind(wx.EVT_CHOICE, self.onEngineChanged)
+		self.copyResultCheckbox.Bind(wx.EVT_CHECKBOX, self.onAnyControlChanged)
+		self.clearCacheButton.Bind(wx.EVT_BUTTON, self.onClearCache)
 
-		self._populate_initial_state()
+		self._populateInitialState()
 
-	def _on_destroy(self, event: wx.Event) -> None:
+	def _onDestroy(self, event: wx.Event) -> None:
 		"""Ensure the timer is stopped when the panel is destroyed."""
-		if self._engine_switch_timer and self._engine_switch_timer.IsRunning():
-			self._engine_switch_timer.Stop()
+		if self._engineSwitchTimer and self._engineSwitchTimer.IsRunning():
+			self._engineSwitchTimer.Stop()
 		event.Skip()
 
 	def onSave(self):
-		conf = config.get_config()
-		self._sync_model_from_ui()
+		conf = config.getConfig()
+		self._syncModelFromUi()
 
-		conf["engine"] = self.ui_model["engine"]
-		conf["copyResult"] = self.ui_model["copyResult"]
+		conf["engine"] = self.uiModel["engine"]
+		conf["copyResult"] = self.uiModel["copyResult"]
 
-		for engine_id, controls in self.dynamic_controls.items():
+		for engineId, controls in self.dynamicControls.items():
 			if not controls:
 				continue
-			if engine_id not in conf["engines"]:
-				conf["engines"][engine_id] = {}
-			engine_conf = conf["engines"][engine_id]
+			if engineId not in conf["engines"]:
+				conf["engines"][engineId] = {}
+			engineConf = conf["engines"][engineId]
 			for _unused, info in controls.items():
-				info["handler"].save_to_config(info["control"], engine_conf, info["spec"])
+				info["handler"].saveToConfig(info["control"], engineConf, info["spec"])
 
-	def on_engine_changed(self, event: wx.Event) -> None:
+	def onEngineChanged(self, event: wx.Event) -> None:
 		"""Debounce the engine switch event to avoid stutter on rapid changes."""
 		# If a switch is already scheduled, cancel it.
-		if self._engine_switch_timer and self._engine_switch_timer.IsRunning():
-			self._engine_switch_timer.Stop()
+		if self._engineSwitchTimer and self._engineSwitchTimer.IsRunning():
+			self._engineSwitchTimer.Stop()
 
 		# Schedule the actual switch to happen after a short delay (200ms).
-		self._engine_switch_timer = wx.CallLater(200, self._perform_engine_switch)
+		self._engineSwitchTimer = wx.CallLater(200, self._performEngineSwitch)
 
-	def _perform_engine_switch(self):
+	def _performEngineSwitch(self):
 		"""The actual logic that switches the panel, called by the timer."""
 		self.Freeze()
 		try:
-			self._switch_engine_panel()
+			self._switchEnginePanel()
 		finally:
 			self._sendLayoutUpdatedEvent()
 			self.Thaw()
 
-	def on_any_control_changed(self, event: wx.Event | None = None):
+	def onAnyControlChanged(self, event: wx.Event | None = None):
 		if event:
 			event.Skip()
 
-		self._sync_model_from_ui()
+		self._syncModelFromUi()
 
-		engine = self._get_selected_engine()
+		engine = self._getSelectedEngine()
 		if not engine:
 			return
 		try:
-			ui_states = engine.get_ui_states(self.ui_model)
-			self._apply_ui_states(ui_states)
+			uiStates = engine.getUiStates(self.uiModel)
+			self._applyUiStates(uiStates)
 		except Exception:
-			log.error(f"Error executing get_ui_states for engine '{engine.id}'.", exc_info=True)
+			log.error(f"Error executing getUiStates for engine '{engine.id}'.", exc_info=True)
 
-	def _populate_initial_state(self):
+	def _populateInitialState(self):
 		self.Freeze()
 		try:
-			conf = config.get_config()
-			for engine_id, engine in self.engines.items():
-				self.engine_choice.Append(engine.name, engine_id)
-			engine_id = conf.get("engine", list(self.engines.keys())[0] if self.engines else None)
-			if engine_id and engine_id in self.engines:
-				self.engine_choice.SetStringSelection(self.engines[engine_id].name)
+			conf = config.getConfig()
+			for engineId, engine in self.engines.items():
+				self.engineChoice.Append(engine.name, engineId)
+			engineId = conf.get("engine", list(self.engines.keys())[0] if self.engines else None)
+			if engineId and engineId in self.engines:
+				self.engineChoice.SetStringSelection(self.engines[engineId].name)
 
-			self.copy_result_checkbox.SetValue(conf.get("copyResult", True))
+			self.copyResultCheckbox.SetValue(conf.get("copyResult", True))
 
-			self._switch_engine_panel()
+			self._switchEnginePanel()
 		finally:
 			self.Thaw()
 
-	def _switch_engine_panel(self):
+	def _switchEnginePanel(self):
 		"""Show the panel for the selected engine, creating it if necessary."""
-		engine_id = self._get_selected_engine_id()
-		if not engine_id:
+		engineId = self._getSelectedEngineId()
+		if not engineId:
 			return
 
-		if self.active_engine_panel:
-			self.active_engine_panel.Hide()
+		if self.activeEnginePanel:
+			self.activeEnginePanel.Hide()
 
-		if engine_id in self.engine_panels_cache:
-			panel = self.engine_panels_cache[engine_id]
+		if engineId in self.enginePanelsCache:
+			panel = self.enginePanelsCache[engineId]
 			panel.Show()
-			self.active_engine_panel = panel
+			self.activeEnginePanel = panel
 		else:
-			panel = self._create_engine_panel(engine_id)
-			self.engine_panels_cache[engine_id] = panel
-			self.engine_panel_container_sizer.Add(panel, 1, wx.EXPAND)
-			self.active_engine_panel = panel
+			panel = self._createEnginePanel(engineId)
+			self.enginePanelsCache[engineId] = panel
+			self.enginePanelContainerSizer.Add(panel, 1, wx.EXPAND)
+			self.activeEnginePanel = panel
 
-		self.on_any_control_changed()
+		self.onAnyControlChanged()
 		self.Layout()
 
-	def _create_engine_panel(self, engine_id: str) -> wx.Panel:
+	def _createEnginePanel(self, engineId: str) -> wx.Panel:
 		"""Create and populate the settings panel for a specific engine ONCE."""
 		panel = wx.Panel(self)
-		engine = self.engines.get(engine_id)
+		engine = self.engines.get(engineId)
 		if not engine:
 			return panel
 
-		engine_conf = config.get_config()["engines"].get(engine.id, {})
-		config_spec_list = engine.get_config_spec()
+		engineConf = config.getConfig()["engines"].get(engine.id, {})
+		configSpecList = engine.getConfigSpec()
 
-		self.dynamic_controls[engine_id] = {}
+		self.dynamicControls[engineId] = {}
 
 		box = wx.StaticBox(panel, label=_("Current Engine Settings"))
-		container_sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
+		containerSizer = wx.StaticBoxSizer(box, wx.VERTICAL)
 
-		if not config_spec_list:
-			no_settings_text = wx.StaticText(
+		if not configSpecList:
+			noSettingsText = wx.StaticText(
 				panel, label=_("This engine requires no additional configuration.")
 			)
-			container_sizer.Add(no_settings_text, 0, wx.ALL, 5)
-			panel.SetSizer(container_sizer)
+			containerSizer.Add(noSettingsText, 0, wx.ALL, 5)
+			panel.SetSizer(containerSizer)
 			return panel
 
-		grid_sizer = wx.FlexGridSizer(cols=2, vgap=5, hgap=5)
-		grid_sizer.AddGrowableCol(1)
+		gridSizer = wx.FlexGridSizer(cols=2, vgap=5, hgap=5)
+		gridSizer.AddGrowableCol(1)
 
-		for spec in config_spec_list:
-			handler = ui_factory.get_control_handler(spec["type"])
-			label_control, control = handler.create_control_pair(panel, spec)
+		for spec in configSpecList:
+			handler = uiFactory.getControlHandler(spec["type"])
+			labelControl, control = handler.createControlPair(panel, spec)
 
-			handler.load_from_config(control, engine_conf, spec)
-			handler.bind_event(control, self.on_any_control_changed)
+			handler.loadFromConfig(control, engineConf, spec)
+			handler.bindEvent(control, self.onAnyControlChanged)
 
-			if label_control is None:
-				grid_sizer.Add(control, 1, wx.EXPAND)
-				grid_sizer.AddSpacer(0)
+			if labelControl is None:
+				gridSizer.Add(control, 1, wx.EXPAND)
+				gridSizer.AddSpacer(0)
 			else:
-				grid_sizer.Add(label_control, 0, wx.ALIGN_CENTER_VERTICAL)
-				grid_sizer.Add(control, 1, wx.EXPAND)
+				gridSizer.Add(labelControl, 0, wx.ALIGN_CENTER_VERTICAL)
+				gridSizer.Add(control, 1, wx.EXPAND)
 
-			self.dynamic_controls[engine_id][spec["id"]] = {
+			self.dynamicControls[engineId][spec["id"]] = {
 				"control": control,
 				"handler": handler,
 				"spec": spec,
-				"label_control": label_control,
+				"labelControl": labelControl,
 			}
 
-		container_sizer.Add(grid_sizer, 1, wx.EXPAND | wx.ALL, 5)
-		panel.SetSizer(container_sizer)
+		containerSizer.Add(gridSizer, 1, wx.EXPAND | wx.ALL, 5)
+		panel.SetSizer(containerSizer)
 		return panel
 
-	def _apply_ui_states(self, ui_states: dict[str, dict[str, Any]]):
-		engine_id = self._get_selected_engine_id()
-		if not engine_id or engine_id not in self.dynamic_controls:
+	def _applyUiStates(self, uiStates: dict[str, dict[str, Any]]):
+		engineId = self._getSelectedEngineId()
+		if not engineId or engineId not in self.dynamicControls:
 			return
 
-		for cid, states in ui_states.items():
-			info = self.dynamic_controls[engine_id].get(cid)
+		for cid, states in uiStates.items():
+			info = self.dynamicControls[engineId].get(cid)
 			if not info:
 				continue
 			handler = info["handler"]
 			for prop, value in states.items():
-				handler.update_control_state(info["control"], info["label_control"], prop, value)
+				handler.updateControlState(info["control"], info["labelControl"], prop, value)
 
 		self.Layout()
 
-	def _sync_model_from_ui(self):
-		engine_id = self._get_selected_engine_id()
-		if not engine_id:
+	def _syncModelFromUi(self):
+		engineId = self._getSelectedEngineId()
+		if not engineId:
 			return
 
-		self.ui_model = {
-			"engine": engine_id,
-			"copyResult": self.copy_result_checkbox.IsChecked(),
+		self.uiModel = {
+			"engine": engineId,
+			"copyResult": self.copyResultCheckbox.IsChecked(),
 		}
 
-		if engine_id in self.dynamic_controls:
-			for cid, info in self.dynamic_controls[engine_id].items():
-				self.ui_model[cid] = info["handler"].get_value_from_control(info["control"])
+		if engineId in self.dynamicControls:
+			for cid, info in self.dynamicControls[engineId].items():
+				self.uiModel[cid] = info["handler"].getValueFromControl(info["control"])
 
 	def onPanelActivated(self):
 		super().onPanelActivated()
-		self._update_cache_button()
+		self._updateCacheButton()
 
-	def _get_selected_engine_id(self) -> str | None:
-		selection = self.engine_choice.GetSelection()
+	def _getSelectedEngineId(self) -> str | None:
+		selection = self.engineChoice.GetSelection()
 		if selection == wx.NOT_FOUND:
 			return None
-		return self.engine_choice.GetClientData(selection)
+		return self.engineChoice.GetClientData(selection)
 
-	def _get_selected_engine(self) -> Any | None:
-		engine_id = self._get_selected_engine_id()
-		if not engine_id:
+	def _getSelectedEngine(self) -> Any | None:
+		engineId = self._getSelectedEngineId()
+		if not engineId:
 			return None
-		return self.engines.get(engine_id)
+		return self.engines.get(engineId)
 
-	def on_clear_cache(self, event: wx.Event):
+	def onClearCache(self, event: wx.Event):
 		self.cache.clear()
-		self._update_cache_button()
-		wx.CallAfter(self.clear_cache_button.SetFocus)
+		self._updateCacheButton()
+		wx.CallAfter(self.clearCacheButton.SetFocus)
 
-	def _update_cache_button(self):
-		self.clear_cache_button.SetLabel(_("Clear Cache (Items: {})").format(self.cache.get_item_count()))
+	def _updateCacheButton(self):
+		self.clearCacheButton.SetLabel(_("Clear Cache (Items: {})").format(self.cache.getItemCount()))

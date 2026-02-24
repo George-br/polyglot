@@ -5,7 +5,7 @@ import json
 import hashlib
 import time
 import urllib.parse
-from typing import Any, Dict
+from typing import Any
 
 import addonHandler
 from logHandler import log
@@ -56,23 +56,23 @@ class NiutransTranslateEngine(BaseHttpEngine):
 	}
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		return 5000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "en"
 
 	@property
-	def reports_detected_language(self) -> bool:
+	def reportsDetectedLanguage(self) -> bool:
 		return False
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"auto",
 			"zh",
 			"en",
@@ -81,10 +81,10 @@ class NiutransTranslateEngine(BaseHttpEngine):
 			"am",
 			"acu",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{"id": "appId", "label": _("App ID"), "type": "text", "default": ""},
@@ -110,86 +110,86 @@ class NiutransTranslateEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_ui_states(self, all_configs: Dict[str, Any]) -> Dict[str, Any]:
+	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, Any]:
 		"""Controls the visibility of the bilingual order choice based on the checkbox."""
-		states = super().get_ui_states(all_configs)
-		is_bilingual_enabled = all_configs.get("enableBilingual", False)
+		states = super().getUiStates(allConfigs)
+		isBilingualEnabled = allConfigs.get("enableBilingual", False)
 		# The bilingual order dropdown is only visible if bilingual mode is enabled.
-		states["bilingualOrder"] = {"visible": is_bilingual_enabled}
+		states["bilingualOrder"] = {"visible": isBilingualEnabled}
 		return states
 
-	def _generate_auth_str(self, params: dict, apikey: str) -> str:
+	def _generateAuthStr(self, params: dict, apikey: str) -> str:
 		"""Generates the authentication signature (authStr) as required by the v2.0 API."""
-		params_with_apikey = params.copy()
-		params_with_apikey["apikey"] = apikey
+		paramsWithApikey = params.copy()
+		paramsWithApikey["apikey"] = apikey
 
-		sorted_params = sorted(params_with_apikey.items(), key=lambda x: x[0])
+		sortedParams = sorted(paramsWithApikey.items(), key=lambda x: x[0])
 
-		param_str = "&".join([f"{key}={value}" for key, value in sorted_params])
-		log.debug(f"Niutrans signing string: {param_str}")
+		paramStr = "&".join([f"{key}={value}" for key, value in sortedParams])
+		log.debug(f"Niutrans signing string: {paramStr}")
 
 		md5 = hashlib.md5()
-		md5.update(param_str.encode("utf-8"))
-		auth_str = md5.hexdigest()
-		log.debug(f"Niutrans generated authStr: {auth_str}")
+		md5.update(paramStr.encode("utf-8"))
+		authStr = md5.hexdigest()
+		log.debug(f"Niutrans generated authStr: {authStr}")
 
-		return auth_str
+		return authStr
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
 		"""Builds the request dictionary for the Niutrans v2.0 API call."""
-		app_id = config.get("appId", "").strip()
-		api_key = config.get("apikey", "").strip()
-		if not app_id or not api_key:
+		appId = config.get("appId", "").strip()
+		apiKey = config.get("apikey", "").strip()
+		if not appId or not apiKey:
 			raise AuthenticationError(_("App ID and API Key for Niutrans must be configured."))
 
-		use_bilingual_mode = config.get("enableBilingual", False)
-		url = self.API_URL_BILINGUAL if use_bilingual_mode else self.API_URL_STANDARD
+		useBilingualMode = config.get("enableBilingual", False)
+		url = self.API_URL_BILINGUAL if useBilingualMode else self.API_URL_STANDARD
 
 		timestamp = str(int(time.time()))
-		params_for_signing = {
-			"from": lang_from,
-			"to": lang_to,
-			"appId": app_id,
+		paramsForSigning = {
+			"from": langFrom,
+			"to": langTo,
+			"appId": appId,
 			"srcText": text,
 			"timestamp": timestamp,
 		}
 
-		auth_str = self._generate_auth_str(params_for_signing, api_key)
+		authStr = self._generateAuthStr(paramsForSigning, apiKey)
 
-		final_payload = params_for_signing.copy()
-		final_payload["authStr"] = auth_str
+		finalPayload = paramsForSigning.copy()
+		finalPayload["authStr"] = authStr
 
 		return {
 			"method": "POST",
 			"url": url,
 			"headers": {"Content-Type": "application/x-www-form-urlencoded"},
-			"data": urllib.parse.urlencode(final_payload).encode("utf-8"),
+			"data": urllib.parse.urlencode(finalPayload).encode("utf-8"),
 		}
 
-	def _translate_chunk(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		"""Overrides the base _translate_chunk method to pass the config to the response parser."""
+	def _translateChunk(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		"""Overrides the base _translateChunk method to pass the config to the response parser."""
 		try:
-			params = self._build_request_params(text, lang_from, lang_to, config)
+			params = self._buildRequestParams(text, langFrom, langTo, config)
 			log.debug(f"Engine '{self.id}' built request params: {params.get('method')} {params.get('url')}")
 
-			proxy_mode = config.get("proxyMode", "system")
-			proxies_dict = None
-			if proxy_mode == "none":
-				proxies_dict = {"http": None, "https": None}
-			timeout_int = int(config.get("timeout", "15"))
+			proxyMode = config.get("proxyMode", "system")
+			proxiesDict = None
+			if proxyMode == "none":
+				proxiesDict = {"http": None, "https": None}
+			timeoutInt = int(config.get("timeout", "15"))
 
-			from ...common.network import send_request
+			from ...common.network import sendRequest
 
-			response_body = send_request(
+			responseBody = sendRequest(
 				method=params.get("method", "GET"),
 				url=params["url"],
 				headers=params.get("headers"),
 				data=params.get("data"),
-				timeout=timeout_int,
-				proxies=proxies_dict,
+				timeout=timeoutInt,
+				proxies=proxiesDict,
 			)
-			log.debug(f"Engine '{self.id}' raw response: {response_body}")
-			return self._parse_response(response_body, config)
+			log.debug(f"Engine '{self.id}' raw response: {responseBody}")
+			return self._parseResponse(responseBody, config)
 		except json.JSONDecodeError as e:
 			log.error(f"Failed to parse JSON response from '{self.id}'.", exc_info=True)
 			raise ResponseParsingError(_("Failed to parse response from translation service.")) from e
@@ -199,49 +199,49 @@ class NiutransTranslateEngine(BaseHttpEngine):
 			log.error(f"An unexpected error occurred in '{self.id}' engine.", exc_info=True)
 			raise EngineError(_("An unknown error occurred during translation.")) from e
 
-	def _parse_response(self, response_body: str, config: dict) -> dict:
+	def _parseResponse(self, responseBody: str, config: dict) -> dict:
 		"""Parses the JSON response from the Niutrans v2.0 API."""
 		try:
-			data = json.loads(response_body)
+			data = json.loads(responseBody)
 		except json.JSONDecodeError:
 			raise NiutransApiError(_("Failed to parse API response. Response was not valid JSON."))
 
 		if "errorCode" in data:
-			error_code = data.get("errorCode")
-			error_msg = self.ERROR_CODES.get(error_code, data.get("errorMsg", "Unknown API error"))
-			raise NiutransApiError(f"{error_msg} (Code: {error_code})")
+			errorCode = data.get("errorCode")
+			errorMsg = self.ERROR_CODES.get(errorCode, data.get("errorMsg", "Unknown API error"))
+			raise NiutransApiError(f"{errorMsg} (Code: {errorCode})")
 
-		use_bilingual_mode = config.get("enableBilingual", False)
+		useBilingualMode = config.get("enableBilingual", False)
 
-		if use_bilingual_mode:
-			align_data = data.get("align")
-			if align_data:
-				bilingual_order = config.get("bilingualOrder", "src_first")
-				bilingual_pairs = []
-				for para_key in sorted(align_data.keys()):
-					paragraph = align_data[para_key]
+		if useBilingualMode:
+			alignData = data.get("align")
+			if alignData:
+				bilingualOrder = config.get("bilingualOrder", "src_first")
+				bilingualPairs = []
+				for paraKey in sorted(alignData.keys()):
+					paragraph = alignData[paraKey]
 					if not isinstance(paragraph, dict):
 						continue
-					for sent_key in sorted(paragraph.keys()):
-						sentence_pair = paragraph[sent_key]
-						src_text = sentence_pair.get("src", "")
-						tgt_text = sentence_pair.get("tgt", "")
+					for sentKey in sorted(paragraph.keys()):
+						sentencePair = paragraph[sentKey]
+						srcText = sentencePair.get("src", "")
+						tgtText = sentencePair.get("tgt", "")
 						# Conditionally format the output based on the user's choice.
-						if bilingual_order == "tgt_first":
-							bilingual_pairs.append(f"{tgt_text}\n{src_text}")
+						if bilingualOrder == "tgt_first":
+							bilingualPairs.append(f"{tgtText}\n{srcText}")
 						else:  # Default to source first.
-							bilingual_pairs.append(f"{src_text}\n{tgt_text}")
+							bilingualPairs.append(f"{srcText}\n{tgtText}")
 
-				final_text = "\n\n".join(bilingual_pairs)
-				return {"translation": final_text.strip(), "lang_detected": None}
+				finalText = "\n\n".join(bilingualPairs)
+				return {"translation": finalText.strip(), "langDetected": None}
 			else:
 				log.warning("Bilingual mode enabled, but 'align' field was not found in the response.")
-				translated_text = data.get("tgtText", "")
-				return {"translation": translated_text.strip(), "lang_detected": None}
+				translatedText = data.get("tgtText", "")
+				return {"translation": translatedText.strip(), "langDetected": None}
 
-		translated_text = data.get("tgtText")
-		if translated_text is not None:
-			return {"translation": translated_text.strip(), "lang_detected": None}
+		translatedText = data.get("tgtText")
+		if translatedText is not None:
+			return {"translation": translatedText.strip(), "langDetected": None}
 		else:
-			log.error(f"Niutrans response missing 'tgtText'. Raw response: {response_body}")
+			log.error(f"Niutrans response missing 'tgtText'. Raw response: {responseBody}")
 			raise NiutransApiError(_("Invalid API response or no translation result included."))

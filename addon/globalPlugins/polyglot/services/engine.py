@@ -11,9 +11,9 @@ import addonHandler
 from logHandler import log
 
 from ..common.exceptions import EngineError, ResponseParsingError
-from ..common.network import send_request
-from ..common.text_utils import split_text
-from ..common.cues import beep
+from ..common.network import sendRequest
+from ..common.textUtils import splitText
+from ..common.cues import Beep
 
 addonHandler.initTranslation()
 
@@ -35,7 +35,7 @@ class TranslationEngine(ABC):
 
 	@property
 	@abstractmethod
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		"""
 		Returns the language code this engine uses for "auto-detect".
 		Subclasses must return None if not supported.
@@ -43,28 +43,28 @@ class TranslationEngine(ABC):
 		pass
 
 	@property
-	def supports_language_detection(self) -> bool:
-		"""A convenience property for readability, its behavior is derived from auto_detect_code."""
-		return self.auto_detect_code is not None
+	def supportsLanguageDetection(self) -> bool:
+		"""A convenience property for readability, its behavior is derived from autoDetectCode."""
+		return self.autoDetectCode is not None
 
 	@property
-	def reports_detected_language(self) -> bool:
+	def reportsDetectedLanguage(self) -> bool:
 		"""Reports the ability to detect the source language. Defaults to whether language detection is supported."""
-		return self.supports_language_detection
+		return self.supportsLanguageDetection
 
 	@abstractmethod
-	def get_config_spec(self) -> list[dict[str, Any]]:
+	def getConfigSpec(self) -> list[dict[str, Any]]:
 		pass
 
 	@abstractmethod
-	def get_supported_languages(self) -> dict[str, str]:
+	def getSupportedLanguages(self) -> dict[str, str]:
 		pass
 
 	@abstractmethod
-	def translate(self, text: str, lang_from: str, lang_to: str, config: dict[str, Any], is_cancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
+	def translate(self, text: str, langFrom: str, langTo: str, config: dict[str, Any], isCancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
 		pass
 
-	def get_ui_states(self, all_configs: dict[str, Any]) -> dict[str, Any]:
+	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, Any]:
 		return {}
 
 
@@ -74,7 +74,7 @@ class BaseHttpEngine(TranslationEngine):
 	"""
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		"""
 		Returns the maximum number of characters allowed per request.
 		Returns 0 or less if there is no limit.
@@ -82,7 +82,7 @@ class BaseHttpEngine(TranslationEngine):
 		return 0
 
 	@property
-	def request_delay_range(self) -> tuple[float, float] | None:
+	def requestDelayRange(self) -> tuple[float, float] | None:
 		"""
 		Defines a range of random delay (in seconds) between chunked requests.
 		Returns (min, max) or None to disable. Default is a gentle range.
@@ -91,65 +91,65 @@ class BaseHttpEngine(TranslationEngine):
 
 	@property
 	@abstractmethod
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		"""
 		This method remains abstract in BaseHttpEngine,
 		forcing all concrete HTTP engines to implement it explicitly.
 		"""
 		raise NotImplementedError(
-			f"""Translation engine '{self.id}' must explicitly implement the 'auto_detect_code' property in a subclass (return None if not supported)."""
+			f"""Translation engine '{self.id}' must explicitly implement the 'autoDetectCode' property in a subclass (return None if not supported)."""
 		)
 
 	@property
-	def default_source_language(self) -> str:
+	def defaultSourceLanguage(self) -> str:
 		"""
 		Provides an intelligent, conditional default source language.
-		- If the engine supports language detection, it automatically uses its auto_detect_code.
+		- If the engine supports language detection, it automatically uses its autoDetectCode.
 		- If not, the subclass is forced to override this property and provide a specific language.
 		"""
-		auto_code = self.auto_detect_code
-		if self.supports_language_detection and auto_code is not None:
-			return auto_code
+		autoCode = self.autoDetectCode
+		if self.supportsLanguageDetection and autoCode is not None:
+			return autoCode
 		raise NotImplementedError(
-			f"""Translation engine '{self.id}' does not support auto language detection, and must therefore explicitly override the 'default_source_language' property in a subclass."""
+			f"""Translation engine '{self.id}' does not support auto language detection, and must therefore explicitly override the 'defaultSourceLanguage' property in a subclass."""
 		)
 
 	@property
 	@abstractmethod
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		"""
 		Forces all concrete HTTP engines to explicitly define their default target language.
 		"""
 		raise NotImplementedError(
-			f"Translation engine '{self.id}' must explicitly implement the 'default_target_language' property."
+			f"Translation engine '{self.id}' must explicitly implement the 'defaultTargetLanguage' property."
 		)
 
-	def get_config_spec(self) -> list[dict[str, Any]]:
-		all_langs = self.get_supported_languages()
-		auto_code = self.auto_detect_code
+	def getConfigSpec(self) -> list[dict[str, Any]]:
+		allLangs = self.getSupportedLanguages()
+		autoCode = self.autoDetectCode
 
-		from_choices = all_langs.copy()
-		if not self.supports_language_detection and auto_code:
-			_unused = from_choices.pop(auto_code, None)
+		fromChoices = allLangs.copy()
+		if not self.supportsLanguageDetection and autoCode:
+			_unused = fromChoices.pop(autoCode, None)
 
-		to_choices = all_langs.copy()
-		if auto_code is not None:
-			_unused = to_choices.pop(auto_code, None)
+		toChoices = allLangs.copy()
+		if autoCode is not None:
+			_unused = toChoices.pop(autoCode, None)
 
 		spec: list[dict[str, Any]] = [
 			{
 				"id": "langFrom",
 				"label": _("Source language:"),
 				"type": "choice",
-				"choices": from_choices,
-				"default": self.default_source_language,
+				"choices": fromChoices,
+				"default": self.defaultSourceLanguage,
 			},
 			{
 				"id": "langTo",
 				"label": _("Target language:"),
 				"type": "choice",
-				"choices": to_choices,
-				"default": self.default_target_language,
+				"choices": toChoices,
+				"default": self.defaultTargetLanguage,
 			},
 		]
 
@@ -176,8 +176,8 @@ class BaseHttpEngine(TranslationEngine):
 			]
 		)
 
-		if self.reports_detected_language:
-			swap_choices = to_choices.copy()
+		if self.reportsDetectedLanguage:
+			swapChoices = toChoices.copy()
 			spec.extend(
 				[
 					{
@@ -192,133 +192,133 @@ class BaseHttpEngine(TranslationEngine):
 						"id": "swapLanguage",
 						"label": _("Swap to language:"),
 						"type": "choice",
-						"choices": swap_choices,
+						"choices": swapChoices,
 						"default": "",
 					},
 				]
 			)
 		return spec
 
-	def _get_filtered_choices(
-		self, all_langs: dict[str, str], exclude_code: str | None = None, remove_auto: bool = False
+	def _getFilteredChoices(
+		self, allLangs: dict[str, str], excludeCode: str | None = None, removeAuto: bool = False
 	) -> dict[str, str]:
 		"""A helper function to create a filtered dictionary of language options based on rules."""
-		choices = all_langs.copy()
-		if remove_auto and self.auto_detect_code is not None:
-			_unused = choices.pop(self.auto_detect_code, None)
-		if exclude_code:
-			_unused = choices.pop(exclude_code, None)
+		choices = allLangs.copy()
+		if removeAuto and self.autoDetectCode is not None:
+			_unused = choices.pop(self.autoDetectCode, None)
+		if excludeCode:
+			_unused = choices.pop(excludeCode, None)
 		return choices
 
-	def get_ui_states(self, all_configs: dict[str, Any]) -> dict[str, dict[str, Any]]:
-		states = super().get_ui_states(all_configs)
-		all_langs = self.get_supported_languages()
-		auto_code = self.auto_detect_code
-		selected_from = all_configs.get("langFrom")
-		selected_to = all_configs.get("langTo")
+	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, dict[str, Any]]:
+		states = super().getUiStates(allConfigs)
+		allLangs = self.getSupportedLanguages()
+		autoCode = self.autoDetectCode
+		selectedFrom = allConfigs.get("langFrom")
+		selectedTo = allConfigs.get("langTo")
 		# --- Generate language lists using the helper function ---
 		# Target language (langTo): Always remove "auto-detect" and exclude the currently selected source language.
-		valid_to_langs = self._get_filtered_choices(all_langs, exclude_code=selected_from, remove_auto=True)
+		validToLangs = self._getFilteredChoices(allLangs, excludeCode=selectedFrom, removeAuto=True)
 		# Source language (langFrom): Exclude the currently selected target language.
-		valid_from_langs = self._get_filtered_choices(all_langs, exclude_code=selected_to)
+		validFromLangs = self._getFilteredChoices(allLangs, excludeCode=selectedTo)
 		# Special handling for the source list: only remove "auto-detect" if the engine does not support it.
-		if not self.supports_language_detection and auto_code:
-			_unused = valid_from_langs.pop(auto_code, None)
-		states["langFrom"] = {"choices": valid_from_langs}
-		states["langTo"] = {"choices": valid_to_langs}
+		if not self.supportsLanguageDetection and autoCode:
+			_unused = validFromLangs.pop(autoCode, None)
+		states["langFrom"] = {"choices": validFromLangs}
+		states["langTo"] = {"choices": validToLangs}
 		# --- Logic for auto-swap related controls ---
-		if self.reports_detected_language:
-			is_auto_from = selected_from == auto_code
-			states["enableAutoSwap"] = {"visible": is_auto_from}
-			is_swap_lang_visible = is_auto_from and all_configs.get("enableAutoSwap", False)
+		if self.reportsDetectedLanguage:
+			isAutoFrom = selectedFrom == autoCode
+			states["enableAutoSwap"] = {"visible": isAutoFrom}
+			isSwapLangVisible = isAutoFrom and allConfigs.get("enableAutoSwap", False)
 			# Swap-to language (swapLanguage): Rules are the same as for target language; exclude current target and "auto-detect".
-			valid_swap_langs = self._get_filtered_choices(
-				all_langs, exclude_code=selected_to, remove_auto=True
+			validSwapLangs = self._getFilteredChoices(
+				allLangs, excludeCode=selectedTo, removeAuto=True
 			)
-			states["swapLanguage"] = {"visible": is_swap_lang_visible, "choices": valid_swap_langs}
+			states["swapLanguage"] = {"visible": isSwapLangVisible, "choices": validSwapLangs}
 		return states
 
 	@abstractmethod
-	def _build_request_params(
-		self, text: str, lang_from: str, lang_to: str, config: dict[str, Any]
+	def _buildRequestParams(
+		self, text: str, langFrom: str, langTo: str, config: dict[str, Any]
 	) -> dict[str, Any]:
 		pass
 
 	@abstractmethod
-	def _parse_response(self, response_body: str) -> dict[str, Any]:
+	def _parseResponse(self, responseBody: str) -> dict[str, Any]:
 		pass
 
-	def translate(self, text: str, lang_from: str, lang_to: str, config: dict[str, Any], is_cancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
-		limit = self.max_request_length
+	def translate(self, text: str, langFrom: str, langTo: str, config: dict[str, Any], isCancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
+		limit = self.maxRequestLength
 		if limit <= 0 or len(text) <= limit:
-			return self._translate_chunk(text, lang_from, lang_to, config)
+			return self._translateChunk(text, langFrom, langTo, config)
 		
-		chunks = split_text(text, limit)
-		total_chunks = len(chunks)
-		delay_range = self.request_delay_range
+		chunks = splitText(text, limit)
+		totalChunks = len(chunks)
+		delayRange = self.requestDelayRange
 
-		translated_chunks = []
-		detected_lang = None
+		translatedChunks = []
+		detectedLang = None
 		for i, chunk in enumerate(chunks):
-			if is_cancelled and is_cancelled():
+			if isCancelled and isCancelled():
 				log.debug("Chunked translation cancelled mid-way.")
 				break
 				
 			if not chunk.strip():
-				translated_chunks.append(chunk)
+				translatedChunks.append(chunk)
 				continue
 				
-			if i > 0 and delay_range:
-				time.sleep(random.uniform(*delay_range))
+			if i > 0 and delayRange:
+				time.sleep(random.uniform(*delayRange))
 
-			leading_ws = len(chunk) - len(chunk.lstrip())
-			trailing_ws = len(chunk) - len(chunk.rstrip())
+			leadingWs = len(chunk) - len(chunk.lstrip())
+			trailingWs = len(chunk) - len(chunk.rstrip())
 			
-			leading_str = chunk[:leading_ws] if leading_ws > 0 else ""
-			trailing_str = chunk[-trailing_ws:] if trailing_ws > 0 else ""
+			leadingStr = chunk[:leadingWs] if leadingWs > 0 else ""
+			trailingStr = chunk[-trailingWs:] if trailingWs > 0 else ""
 			
-			stripped_chunk = chunk.strip()
-			if not stripped_chunk:
-				translated_chunks.append(chunk)
+			strippedChunk = chunk.strip()
+			if not strippedChunk:
+				translatedChunks.append(chunk)
 				continue
 
-			res = self._translate_chunk(stripped_chunk, lang_from, lang_to, config)
-			translated_text = res.get("translation", "").strip()
+			res = self._translateChunk(strippedChunk, langFrom, langTo, config)
+			translatedText = res.get("translation", "").strip()
 			
-			translated_chunks.append(leading_str + translated_text + trailing_str)
+			translatedChunks.append(leadingStr + translatedText + trailingStr)
 			
-			if total_chunks > 1:
-				beep.play_progress(i + 1, total_chunks)
+			if totalChunks > 1:
+				Beep.playProgress(i + 1, totalChunks)
 
-			if detected_lang is None and "lang_detected" in res:
-				detected_lang = res["lang_detected"]
+			if detectedLang is None and "langDetected" in res:
+				detectedLang = res["langDetected"]
 		
 		return {
-			"translation": "".join(translated_chunks),
-			"lang_detected": detected_lang
+			"translation": "".join(translatedChunks),
+			"langDetected": detectedLang
 		}
 
-	def _translate_chunk(self, text: str, lang_from: str, lang_to: str, config: dict[str, Any]) -> dict[str, Any]:
+	def _translateChunk(self, text: str, langFrom: str, langTo: str, config: dict[str, Any]) -> dict[str, Any]:
 		try:
-			params = self._build_request_params(text, lang_from, lang_to, config)
+			params = self._buildRequestParams(text, langFrom, langTo, config)
 			log.debug(f"Engine '{self.id}' built request params: {params.get('method')} {params.get('url')}")
-			proxy_mode = config.get("proxyMode", "system")
-			proxies_dict: dict[str, str | None] | None = (
+			proxyMode = config.get("proxyMode", "system")
+			proxiesDict: dict[str, str | None] | None = (
 				None  # Default is None, which makes requests use system proxy settings.
 			)
-			if proxy_mode == "none":
-				proxies_dict = {"http": None, "https": None}
-			timeout_int = int(config.get("timeout", "15"))
-			response_body = send_request(
+			if proxyMode == "none":
+				proxiesDict = {"http": None, "https": None}
+			timeoutInt = int(config.get("timeout", "15"))
+			responseBody = sendRequest(
 				method=params.get("method", "GET"),
 				url=params["url"],
 				headers=params.get("headers"),
 				data=params.get("data"),
-				timeout=timeout_int,
-				proxies=proxies_dict,
+				timeout=timeoutInt,
+				proxies=proxiesDict,
 			)
-			log.debug(f"Engine '{self.id}' raw response: {response_body}")
-			return self._parse_response(response_body)
+			log.debug(f"Engine '{self.id}' raw response: {responseBody}")
+			return self._parseResponse(responseBody)
 		except json.JSONDecodeError as e:
 			log.error(f"Failed to parse JSON response from '{self.id}'.", exc_info=True)
 			raise ResponseParsingError(_("Failed to parse response from translation service.")) from e

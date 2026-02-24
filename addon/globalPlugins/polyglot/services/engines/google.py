@@ -20,7 +20,7 @@ class GoogleTranslateEngine(BaseHttpEngine):
 	MIRROR_URL = "https://translate.googleapis.mirror.nvdadr.com"
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		"""
 		Empirical testing (EN->ZH) revealed a limit of 11,440 characters for the gtx endpoint.
 		Even with POST requests, we maintain this limit as a safe threshold to prevent
@@ -29,19 +29,19 @@ class GoogleTranslateEngine(BaseHttpEngine):
 		return 11440
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "zh-CN"
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{
-					"id": "use_mirror",
+					"id": "useMirror",
 					"label": _("Use mirror server (translate.googleapis.mirror.nvdadr.com)"),
 					"type": "checkbox",
 					"default": False,
@@ -50,8 +50,8 @@ class GoogleTranslateEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"auto",
 			"af",
 			"sq",
@@ -157,11 +157,11 @@ class GoogleTranslateEngine(BaseHttpEngine):
 			"yo",
 			"zu",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		base_url = self.MIRROR_URL if config.get("use_mirror", False) else self.BASE_URL
-		url = f"{base_url}/translate_a/single?client=gtx&sl={lang_from}&tl={lang_to}&dt=t"
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		baseUrl = self.MIRROR_URL if config.get("useMirror", False) else self.BASE_URL
+		url = f"{baseUrl}/translate_a/single?client=gtx&sl={langFrom}&tl={langTo}&dt=t"
 		data = urllib.parse.urlencode({"q": text}).encode("utf-8")
 		return {
 			"method": "POST",
@@ -170,10 +170,10 @@ class GoogleTranslateEngine(BaseHttpEngine):
 			"data": data,
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
-		data = json.loads(response_body)
+	def _parseResponse(self, responseBody: str) -> dict:
+		data = json.loads(responseBody)
 		if not data or not data[0]:
 			raise ValueError("No translation found in response.")
-		translated_text = "".join(item[0] for item in data[0] if item[0])
-		detected_lang = data[2] if len(data) > 2 and isinstance(data[2], str) else None
-		return {"translation": translated_text, "lang_detected": detected_lang}
+		translatedText = "".join(item[0] for item in data[0] if item[0])
+		detectedLang = data[2] if len(data) > 2 and isinstance(data[2], str) else None
+		return {"translation": translatedText, "langDetected": detectedLang}

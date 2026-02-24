@@ -28,7 +28,7 @@ class LingvaTranslateEngine(BaseHttpEngine):
 	name = _("Lingva Translate")
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		"""
 		Empirical testing (EN->ZH) revealed a limit of 4,998 characters.
 		CRITICAL: Lingva uses GET requests with the text embedded in the URL path.
@@ -38,20 +38,20 @@ class LingvaTranslateEngine(BaseHttpEngine):
 		return 1000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "zh"
 
 	@property
-	def reports_detected_language(self) -> bool:
+	def reportsDetectedLanguage(self) -> bool:
 		# The API response does not include the detected source language.
 		return False
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"auto",
 			"zh",
 			"zh_HANT",
@@ -81,20 +81,20 @@ class LingvaTranslateEngine(BaseHttpEngine):
 			"uk",
 			"he",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def get_config_spec(self) -> list[dict]:
+	def getConfigSpec(self) -> list[dict]:
 		"""This engine does not require any specific configuration."""
-		return super().get_config_spec()
+		return super().getConfigSpec()
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
 		"""Builds the request dictionary for the Lingva API call."""
 		# The API has a quirk where forward slashes in the text cause issues.
 		# The JS code replaces them with '@@' before encoding.
-		processed_text = text.replace("/", "@@")
-		encoded_text = urllib.parse.quote(processed_text)
+		processedText = text.replace("/", "@@")
+		encodedText = urllib.parse.quote(processedText)
 
-		url = f"https://lingva.pot-app.com/api/v1/{lang_from}/{lang_to}/{encoded_text}"
+		url = f"https://lingva.pot-app.com/api/v1/{langFrom}/{langTo}/{encodedText}"
 
 		return {
 			"method": "GET",
@@ -102,10 +102,10 @@ class LingvaTranslateEngine(BaseHttpEngine):
 			# No headers or data needed for this GET request
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
+	def _parseResponse(self, responseBody: str) -> dict:
 		"""Parses the JSON response from the Lingva API."""
 		try:
-			data = json.loads(response_body)
+			data = json.loads(responseBody)
 		except json.JSONDecodeError:
 			# Sometimes Lingva might return a non-JSON error for very long texts
 			raise LingvaApiError(_("Service returned an invalid result (text may be too long)."))
@@ -114,11 +114,11 @@ class LingvaTranslateEngine(BaseHttpEngine):
 
 		if translation:
 			# Reverse the special character replacement from the request building step.
-			final_translation = translation.replace("@@", "/")
+			finalTranslation = translation.replace("@@", "/")
 			return {
-				"translation": final_translation,
-				"lang_detected": None,  # API doesn't provide this
+				"translation": finalTranslation,
+				"langDetected": None,  # API doesn't provide this
 			}
 		else:
-			error_info = data.get("error", "Unknown API error")
-			raise LingvaApiError(f"{error_info}")
+			errorInfo = data.get("error", "Unknown API error")
+			raise LingvaApiError(f"{errorInfo}")

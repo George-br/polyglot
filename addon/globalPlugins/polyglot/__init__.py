@@ -7,6 +7,7 @@ import config
 import globalPluginHandler
 import globalVars
 import gui
+import inputCore
 import textInfos
 import tones
 import ui
@@ -17,19 +18,19 @@ from logHandler import log
 from scriptHandler import script
 
 from .app.manager import TranslationManager
-from .app.speech_filter import SpeechFilter
+from .app.speechFilter import SpeechFilter
 from .common import cues
 from .common.config import CONF_SECTION
-from .configspec import config_spec
-from .services import engine_manager
-from .views import factory as ui_factory
+from .configspec import configSpec
+from .services import engineManager
+from .views import factory as uiFactory
 from .views import settings
-from .views.interactive_dialog import InteractiveTranslationDialog
+from .views.interactiveDialog import InteractiveTranslationDialog
 
 addonHandler.initTranslation()
 
 
-def _build_final_configspec() -> dict[str, ConfigObj]:
+def _buildFinalConfigSpec() -> dict[str, ConfigObj]:
 	"""
 	Scans all available engines, builds their dynamic config specs,
 	and merges them with the static base spec.
@@ -39,26 +40,26 @@ def _build_final_configspec() -> dict[str, ConfigObj]:
 	Returns:
 		A complete configspec dictionary for the entire addon.
 	"""
-	final_spec = config_spec.copy()
-	engines_spec_section = final_spec["engines"]
-	all_engines = engine_manager.get_all_engines()
-	for engine in all_engines:
-		engine_id = engine.id
-		engine_spec_list = engine.get_config_spec()
-		if not engine_spec_list:
+	finalSpec = configSpec.copy()
+	enginesSpecSection = finalSpec["engines"]
+	allEngines = engineManager.getAllEngines()
+	for engine in allEngines:
+		engineId = engine.id
+		engineSpecList = engine.getConfigSpec()
+		if not engineSpecList:
 			continue
-		if engine_id not in engines_spec_section:
-			engines_spec_section[engine_id] = {}
-		engine_section: Section = engines_spec_section[engine_id]
-		for item in engine_spec_list:
+		if engineId not in enginesSpecSection:
+			enginesSpecSection[engineId] = {}
+		engineSection: Section = enginesSpecSection[engineId]
+		for item in engineSpecList:
 			try:
-				handler = ui_factory.get_control_handler(item["type"])
-				default_val = handler.format_config_default(item["default"])
-				spec_str = f"{item['id']} = {handler.config_type}(default={default_val})"
-				engine_section.merge(ConfigObj([spec_str], list_values=False))
+				handler = uiFactory.getControlHandler(item["type"])
+				defaultVal = handler.formatConfigDefault(item["default"])
+				specStr = f"{item['id']} = {handler.configType}(default={defaultVal})"
+				engineSection.merge(ConfigObj([specStr], list_values=False))
 			except ValueError:
-				log.warning(f"Engine '{engine_id}' has an unknown control type '{item['type']}'. Skipping.")
-	return {CONF_SECTION: final_spec}
+				log.warning(f"Engine '{engineId}' has an unknown control type '{item['type']}'. Skipping.")
+	return {CONF_SECTION: finalSpec}
 
 
 class GlobalPlugin(globalPluginHandler.GlobalPlugin):
@@ -67,19 +68,19 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	def __init__(self):
 		super().__init__()
 		# Let this module build the complete, dynamic config spec.
-		final_spec = _build_final_configspec()
+		finalSpec = _buildFinalConfigSpec()
 		# Merge this final spec into NVDA's configuration.
-		config.conf.spec.merge(final_spec)
+		config.conf.spec.merge(finalSpec)
 		self.manager = TranslationManager()
-		self.speech_filter = SpeechFilter(self.manager)
-		self.speech_filter.register()
-		self.is_layer_active = False
+		self.speechFilter = SpeechFilter(self.manager)
+		self.speechFilter.register()
+		self.isLayerActive = False
 		if not globalVars.appArgs.secure:
 			gui.settingsDialogs.NVDASettingsDialog.categoryClasses.append(settings.TranslationSettingsPanel)
 
 	def terminate(self):
-		self.manager.terminate_all_tasks()
-		self.speech_filter.unregister()
+		self.manager.terminateAllTasks()
+		self.speechFilter.unregister()
 		if not globalVars.appArgs.secure:
 			if settings.TranslationSettingsPanel in gui.settingsDialogs.NVDASettingsDialog.categoryClasses:
 				gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(
@@ -88,133 +89,133 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		super().terminate()
 
 	def getScript(self, gesture: "inputCore.InputGesture") -> None:
-		if not self.is_layer_active:
+		if not self.isLayerActive:
 			return super().getScript(gesture)
 		script = super().getScript(gesture)
 		if not script:
-			script = self.script_layer_error
+			script = self.script_layerError
 
-		if getattr(script, '_stay_in_layer', False):
+		if getattr(script, '_stayInLayer', False):
 			return script
 
-		def wrapped_script(g):
+		def wrappedScript(g):
 			try:
 				script(g)
 			finally:
-				self.finish_layer()
+				self.finishLayer()
 
-		return wrapped_script
+		return wrappedScript
 
-	def finish_layer(self):
-		self.is_layer_active = False
+	def finishLayer(self):
+		self.isLayerActive = False
 		self.clearGestureBindings()
 		self.bindGestures(self.__gestures)
 
-	def script_layer_error(self, gesture: "inputCore.InputGesture") -> None:
+	def script_layerError(self, gesture: "inputCore.InputGesture") -> None:
 		tones.beep(120, 100)
 
 	@script(description=_("Enter translation command layer"))
-	def script_layer_entry(self, gesture: "inputCore.InputGesture") -> None:
-		if self.is_layer_active:
-			self.script_layer_error(gesture)
+	def script_layerEntry(self, gesture: "inputCore.InputGesture") -> None:
+		if self.isLayerActive:
+			self.script_layerError(gesture)
 			return
-		self.bindGestures(self.__layer_gestures)
-		self.is_layer_active = True
+		self.bindGestures(self.__layerGestures)
+		self.isLayerActive = True
 		tones.beep(100, 10)
 
-	def _get_selected_text(self) -> str | None:
+	def _getSelectedText(self) -> str | None:
 		"""Gets selected text, handling errors. Returns text or None."""
 		try:
 			info = api.getCaretObject().makeTextInfo(textInfos.POSITION_SELECTION)
 			if not info or info.isCollapsed:
-				cues.speech.message(_("Nothing selected"))
+				cues.Speech.message(_("Nothing selected"))
 				return None
 			return info.text
 		except NotImplementedError:
 			log.warning("Failed to get selected text from the current object.", exc_info=True)
-			cues.speech.message(_("Cannot get selected text from the current object"))
+			cues.Speech.message(_("Cannot get selected text from the current object"))
 			return None
 
-	def _execute_translation(self, text: str, reverse: bool, show_status: bool) -> None:
+	def _executeTranslation(self, text: str, reverse: bool, showStatus: bool) -> None:
 		"""The single execution engine for all translation requests."""
 		if not reverse:
-			self.manager.request_translation(text, is_manual=True, show_status=show_status)
+			self.manager.requestTranslation(text, isManual=True, showStatus=showStatus)
 		else:
-			new_from, new_to, error_message = self.manager.get_reverse_languages()
-			if error_message:
-				cues.speech.message(error_message)
+			newFrom, newTo, errorMessage = self.manager.getReverseLanguages()
+			if errorMessage:
+				cues.Speech.message(errorMessage)
 				return
-			self.manager.request_translation(
+			self.manager.requestTranslation(
 				text,
-				is_manual=True,
-				show_status=show_status,
-				lang_from=new_from,
-				lang_to=new_to,
+				isManual=True,
+				showStatus=showStatus,
+				langFrom=newFrom,
+				langTo=newTo,
 			)
 
-	def _cycle_language(self, target: str, forward: bool) -> None:
-		success, message = self.manager.cycle_language(target, forward)
-		cues.speech.message(message)
+	def _cycleLanguage(self, target: str, forward: bool) -> None:
+		success, message = self.manager.cycleLanguage(target, forward)
+		cues.Speech.message(message)
 		if not success:
 			tones.beep(220, 120)
 
 	@script(description=_("Next source language"))
 	def script_cycleSourceLangForward(self, gesture: "inputCore.InputGesture") -> None:
-		self._cycle_language("source", forward=True)
-	script_cycleSourceLangForward._stay_in_layer = True
+		self._cycleLanguage("source", forward=True)
+	script_cycleSourceLangForward._stayInLayer = True
 
 	@script(description=_("Previous source language"))
 	def script_cycleSourceLangBackward(self, gesture: "inputCore.InputGesture") -> None:
-		self._cycle_language("source", forward=False)
-	script_cycleSourceLangBackward._stay_in_layer = True
+		self._cycleLanguage("source", forward=False)
+	script_cycleSourceLangBackward._stayInLayer = True
 
 	@script(description=_("Next target language"))
 	def script_cycleTargetLangForward(self, gesture: "inputCore.InputGesture") -> None:
-		self._cycle_language("target", forward=True)
-	script_cycleTargetLangForward._stay_in_layer = True
+		self._cycleLanguage("target", forward=True)
+	script_cycleTargetLangForward._stayInLayer = True
 
 	@script(description=_("Previous target language"))
 	def script_cycleTargetLangBackward(self, gesture: "inputCore.InputGesture") -> None:
-		self._cycle_language("target", forward=False)
-	script_cycleTargetLangBackward._stay_in_layer = True
+		self._cycleLanguage("target", forward=False)
+	script_cycleTargetLangBackward._stayInLayer = True
 
-	def _cycle_engine(self, forward: bool) -> None:
-		success, message = self.manager.cycle_engine(forward)
-		cues.speech.message(message)
+	def _cycleEngine(self, forward: bool) -> None:
+		success, message = self.manager.cycleEngine(forward)
+		cues.Speech.message(message)
 		if not success:
 			tones.beep(220, 120)
 
 	@script(description=_("Next translation engine"))
 	def script_cycleEngineForward(self, gesture: "inputCore.InputGesture") -> None:
-		self._cycle_engine(forward=True)
-	script_cycleEngineForward._stay_in_layer = True
+		self._cycleEngine(forward=True)
+	script_cycleEngineForward._stayInLayer = True
 
 	@script(description=_("Previous translation engine"))
 	def script_cycleEngineBackward(self, gesture: "inputCore.InputGesture") -> None:
-		self._cycle_engine(forward=False)
-	script_cycleEngineBackward._stay_in_layer = True
+		self._cycleEngine(forward=False)
+	script_cycleEngineBackward._stayInLayer = True
 
 	@script(description=_("Swap source and target languages"))
 	def script_swapLanguages(self, gesture: "inputCore.InputGesture") -> None:
-		success, message = self.manager.swap_languages()
-		cues.speech.message(message)
+		success, message = self.manager.swapLanguages()
+		cues.Speech.message(message)
 		if not success:
 			tones.beep(220, 120)
-	script_swapLanguages._stay_in_layer = True
+	script_swapLanguages._stayInLayer = True
 
 	@script(description=_("Announce current engine and languages"))
 	def script_announceEngineLanguagesInfo(self, gesture: "inputCore.InputGesture") -> None:
-		announcement = self.manager.get_current_engine_and_language_info()
-		cues.speech.message(announcement)
-	script_announceEngineLanguagesInfo._stay_in_layer = True
+		announcement = self.manager.getCurrentEngineAndLanguageInfo()
+		cues.Speech.message(announcement)
+	script_announceEngineLanguagesInfo._stayInLayer = True
 
 	@script(description=_("Copy last translation to clipboard"))
 	def script_copyLastResult(self, gesture: "inputCore.InputGesture") -> None:
-		last_result = self.manager.last_translation
-		if last_result:
-			_unused = api.copyToClip(last_result, notify=True)
+		lastResult = self.manager.lastTranslation
+		if lastResult:
+			_unused = api.copyToClip(lastResult, notify=True)
 		else:
-			cues.speech.message(_("No translation result to copy"))
+			cues.Speech.message(_("No translation result to copy"))
 
 	@script(description=_("Open interactive translation dialog"))
 	def script_openInteractiveDialog(self, gesture: "inputCore.InputGesture") -> None:
@@ -239,63 +240,63 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 
 	@script(description=_("Toggle auto-translation"))
 	def script_toggleAutoTranslate(self, gesture: "inputCore.InputGesture") -> None:
-		new_state = self.manager.toggle_auto_translate()
-		cues.speech.message(_("Auto-translation enabled") if new_state else _("Auto-translation disabled"))
+		newState = self.manager.toggleAutoTranslate()
+		cues.Speech.message(_("Auto-translation enabled") if newState else _("Auto-translation disabled"))
 
 	@script(description=_("Clear cache"))
 	def script_clearCache(self, gesture: "inputCore.InputGesture") -> None:
-		self.manager.clear_cache()
-		cues.speech.message(_("Cache cleared"))
+		self.manager.clearCache()
+		cues.Speech.message(_("Cache cleared"))
 
 	@script(description=_("Translate selection"))
 	def script_translateSelection(self, gesture: "inputCore.InputGesture") -> None:
-		if text := self._get_selected_text():
-			self._execute_translation(text, reverse=False, show_status=True)
+		if text := self._getSelectedText():
+			self._executeTranslation(text, reverse=False, showStatus=True)
 
 	@script(description=_("Translate selection (reversed direction)"))
 	def script_translateReverseSelection(self, gesture: "inputCore.InputGesture") -> None:
-		if text := self._get_selected_text():
-			self._execute_translation(text, reverse=True, show_status=True)
+		if text := self._getSelectedText():
+			self._executeTranslation(text, reverse=True, showStatus=True)
 
 	@script(description=_("Translate clipboard"))
 	def script_translateClipboard(self, gesture: "inputCore.InputGesture") -> None:
 		if not (text := api.getClipData()):
-			cues.speech.message(_("Clipboard is empty"))
+			cues.Speech.message(_("Clipboard is empty"))
 			return
-		self._execute_translation(text, reverse=False, show_status=True)
+		self._executeTranslation(text, reverse=False, showStatus=True)
 
 	@script(description=_("Translate clipboard (reversed direction)"))
 	def script_translateReverseClipboard(self, gesture: "inputCore.InputGesture") -> None:
 		if not (text := api.getClipData()):
-			cues.speech.message(_("Clipboard is empty"))
+			cues.Speech.message(_("Clipboard is empty"))
 			return
-		self._execute_translation(text, reverse=True, show_status=True)
+		self._executeTranslation(text, reverse=True, showStatus=True)
 
 	@script(description=_("Translate last spoken text"))
 	def script_translateLastSpoken(self, gesture: "inputCore.InputGesture") -> None:
-		if not (text := self.speech_filter.last_spoken_text):
-			cues.speech.message(_("No last spoken text"))
+		if not (text := self.speechFilter.lastSpokenText):
+			cues.Speech.message(_("No last spoken text"))
 			return
-		self._execute_translation(text, reverse=False, show_status=True)
+		self._executeTranslation(text, reverse=False, showStatus=True)
 
 	@script(description=_("Translate last spoken text (reversed direction)"))
 	def script_translateReverseLastSpoken(self, gesture: "inputCore.InputGesture") -> None:
-		if not (text := self.speech_filter.last_spoken_text):
-			cues.speech.message(_("No last spoken text"))
+		if not (text := self.speechFilter.lastSpokenText):
+			cues.Speech.message(_("No last spoken text"))
 			return
-		self._execute_translation(text, reverse=True, show_status=True)
+		self._executeTranslation(text, reverse=True, showStatus=True)
 
 	@script(description=_("Show command layer help"))
 	def script_layerHelp(self, gesture: "inputCore.InputGesture") -> None:
 		ui.browseableMessage(
-			self._generate_layer_help_html(),
+			self._generateLayerHelpHtml(),
 			title=_("Polyglot Help"),
 			isHtml=True,
 			closeButton=True,
 			copyButton=True
 		)
 
-	def _generate_layer_help_html(self) -> str:
+	def _generateLayerHelpHtml(self) -> str:
 		groups = [
 			(_("Translation Actions"), [
 				"translateSelection", "translateReverseSelection",
@@ -315,30 +316,30 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			])
 		]
 
-		script_to_key = {}
-		for gesture, script_name in self.__layer_gestures.items():
-			_source, key_display_name = KeyboardInputGesture.getDisplayTextForIdentifier(gesture)
-			script_to_key[script_name] = key_display_name
+		scriptToKey = {}
+		for gesture, scriptName in self.__layerGestures.items():
+			_source, keyDisplayName = KeyboardInputGesture.getDisplayTextForIdentifier(gesture)
+			scriptToKey[scriptName] = keyDisplayName
 
-		html_parts = []
+		htmlParts = []
 		for title, scripts in groups:
-			html_parts.append(f"<h2>{title}</h2>")
-			html_parts.append("<table border='1' style='border-collapse: collapse; width: 100%;'>")
-			html_parts.append(f"<thead><tr><th style='text-align: left; padding: 5px;'>{_('Key')}</th><th style='text-align: left; padding: 5px;'>{_('Action')}</th></tr></thead>")
-			html_parts.append("<tbody>")
-			for script_name in scripts:
-				key_display = script_to_key.get(script_name, "")
-				if not key_display:
+			htmlParts.append(f"<h2>{title}</h2>")
+			htmlParts.append("<table border='1' style='border-collapse: collapse; width: 100%;'>")
+			htmlParts.append(f"<thead><tr><th style='text-align: left; padding: 5px;'>{_('Key')}</th><th style='text-align: left; padding: 5px;'>{_('Action')}</th></tr></thead>")
+			htmlParts.append("<tbody>")
+			for scriptName in scripts:
+				keyDisplay = scriptToKey.get(scriptName, "")
+				if not keyDisplay:
 					continue
-				method = getattr(self, f"script_{script_name}")
-				description = method.__doc__ or script_name
-				html_parts.append(f"<tr><td style='padding: 5px;'>{key_display}</td><td style='padding: 5px;'>{description}</td></tr>")
-			html_parts.append("</tbody></table>")
+				method = getattr(self, f"script_{scriptName}")
+				description = method.__doc__ or scriptName
+				htmlParts.append(f"<tr><td style='padding: 5px;'>{keyDisplay}</td><td style='padding: 5px;'>{description}</td></tr>")
+			htmlParts.append("</tbody></table>")
 
-		return "".join(html_parts)
+		return "".join(htmlParts)
 
-	__gestures = {"kb:NVDA+Shift+T": "layer_entry"}
-	__layer_gestures = {
+	__gestures = {"kb:NVDA+Shift+T": "layerEntry"}
+	__layerGestures = {
 		"kb:t": "translateSelection",
 		"kb:shift+t": "translateReverseSelection",
 		"kb:b": "translateClipboard",

@@ -30,85 +30,86 @@ class CueType:
 	INFO = "info"
 
 
-_sounds_dir = os.path.join(globalVars.appArgs.configPath, "addons", "polyglot", "sounds")
+_soundsDir = os.path.join(globalVars.appArgs.configPath, "addons", "polyglot", "sounds")
 
 
-def _get_sound_path(name: str) -> str:
+def _getSoundPath(name: str) -> str:
 	"""Internal helper to get the full path for a sound file."""
-	return os.path.join(_sounds_dir, f"{name}.wav")
+	return os.path.join(_soundsDir, f"{name}.wav")
 
 
 # --- Internal Periodic Cue Machinery (Shared by all cue types) ---
-_progress_thread: threading.Thread | None = None
-_stop_event = threading.Event()
+_progressThread: threading.Thread | None = None
+_stopEvent = threading.Event()
 
 
-def _start_periodic_cue_internal(cue_function: Callable[[], None], interval_ms: int, delay_ms: int) -> None:
+def _startPeriodicCueInternal(cueFunction: Callable[[], None], intervalMs: int, delayMs: int) -> None:
 	"""
 	Internal implementation to start a periodic cue in a background thread.
 	"""
-	global _progress_thread
-	stop_periodic_cue()  # Stop any existing cue first
-	_stop_event.clear()
+	global _progressThread
+	stopPeriodicCue()  # Stop any existing cue first
+	_stopEvent.clear()
 
-	def loop_target():
-		interval_sec = interval_ms / 1000.0
-		delay_sec = delay_ms / 1000.0
-		if delay_sec > 0:
-			if _stop_event.wait(delay_sec):
+	def loopTarget():
+		intervalSec = intervalMs / 1000.0
+		delaySec = delayMs / 1000.0
+		if delaySec > 0:
+			if _stopEvent.wait(delaySec):
 				return
-		while not _stop_event.is_set():
-			cue_function()
-			if _stop_event.wait(interval_sec):
+		while not _stopEvent.is_set():
+			cueFunction()
+			if _stopEvent.wait(intervalSec):
 				break
 
-	_progress_thread = threading.Thread(target=loop_target, daemon=True)
-	_progress_thread.start()
+	_progressThread = threading.Thread(target=loopTarget, daemon=True)
+	_progressThread.start()
 
 
-def stop_periodic_cue() -> None:
+def stopPeriodicCue() -> None:
 	"""
 	Signals the currently running periodic cue, if any, to stop.
 	This function is safe to call even if no cue is running.
 	"""
-	global _progress_thread
-	_stop_event.set()
-	_progress_thread = None
+	global _progressThread
+	_stopEvent.set()
+	_progressThread = None
 
 
-class sound:
+class Sound:
 	"""A namespace for all sound-file-based cues."""
 
 	@staticmethod
-	def play(sound_name: str) -> None:
-		sound_path = _get_sound_path(sound_name)
-		if os.path.exists(sound_path):
-			nvwave.playWaveFile(sound_path)
+	def play(soundName: str) -> None:
+		soundPath = _getSoundPath(soundName)
+		if os.path.exists(soundPath):
+			nvwave.playWaveFile(soundPath)
 
 	@staticmethod
-	def start_periodic(event_name: str, interval_ms: int, delay_ms: int) -> None:
+	def startPeriodic(eventName: str, intervalMs: int, delayMs: int) -> None:
 		"""
 		Starts a periodic sound cue using asynchronous playback.
 
 		IMPORTANT: This method uses non-blocking (asynchronous) sound playback.
 		To prevent audio overlap and chaotic sound stacking, the caller MUST
-		ensure that the specified `interval_ms` is greater than the duration
+		ensure that the specified `intervalMs` is greater than the duration
 		of the audio file being played (e.g., 'waiting.wav').
 
-		For example, if 'waiting.wav' is 300ms long, `interval_ms` should be
+		For example, if 'waiting.wav' is 300ms long, `intervalMs` should be
 		set to a value significantly higher, like 800ms or more.
 
 		Args:
-		    event_name: The name of the sound file to play periodically
+		    eventName: The name of the sound file to play periodically
 		                (e.g., CueType.WAITING).
-		    interval_ms: The interval in milliseconds between each playback trigger.
-		    delay_ms: The initial delay in milliseconds before the first trigger.
+		    intervalMs: The interval in milliseconds between each playback trigger.
+		    delayMs: The initial delay in milliseconds before the first trigger.
 		"""
-		cue_function = lambda: sound.play(event_name)
-		_start_periodic_cue_internal(cue_function, interval_ms, delay_ms)
+		def cueFunction():
+			Sound.play(eventName)
+		_startPeriodicCueInternal(cueFunction, intervalMs, delayMs)
 
 
-class beep:
+class Beep:
 	"""A namespace for all beep-based cues."""
 
 	_BEEPS = {
@@ -120,19 +121,20 @@ class beep:
 	}
 
 	@staticmethod
-	def play(event_name: str) -> None:
+	def play(eventName: str) -> None:
 		"""Plays a predefined beep pattern."""
-		freq, dur = beep._BEEPS.get(event_name, (200, 50))
+		freq, dur = Beep._BEEPS.get(eventName, (200, 50))
 		tones.beep(freq, dur)
 
 	@staticmethod
-	def start_periodic(event_name: str, interval_ms: int, delay_ms: int) -> None:
+	def startPeriodic(eventName: str, intervalMs: int, delayMs: int) -> None:
 		"""Starts a periodic beep cue."""
-		cue_function = lambda: beep.play(event_name)
-		_start_periodic_cue_internal(cue_function, interval_ms, delay_ms)
+		def cueFunction():
+			Beep.play(eventName)
+		_startPeriodicCueInternal(cueFunction, intervalMs, delayMs)
 
 	@staticmethod
-	def play_progress(current: int, total: int) -> None:
+	def playProgress(current: int, total: int) -> None:
 		"""
 		Plays a dynamic pitch beep based on progress.
 		The pitch rises exponentially as the task nears completion,
@@ -149,34 +151,34 @@ class beep:
 		tones.beep(freq, 40)
 
 
-class speech:
+class Speech:
 	"""A namespace for all speech-based cues."""
 
 	@staticmethod
-	def message(text: str, suppress_capture: bool = True) -> None:
+	def message(text: str, suppressCapture: bool = True) -> None:
 		"""Speaks text. MUST be called from the main NVDA thread.
 
 		Args:
 			text: The text to speak.
-			suppress_capture: If True, notifies the speech filter to skip
-				capturing this message as `last_spoken_text`.
+			suppressCapture: If True, notifies the speech filter to skip
+				capturing this message as `lastSpokenText`.
 		"""
-		if suppress_capture and _on_before_speech is not None:
-			_on_before_speech()
+		if suppressCapture and _onBeforeSpeech is not None:
+			_onBeforeSpeech()
 		ui.message(text)
 
 
 # --- Speech Hook Registration ---
-_on_before_speech: Callable[[], None] | None = None
+_onBeforeSpeech: Callable[[], None] | None = None
 
 
-def register_speech_hook(callback: Callable[[], None]) -> None:
+def registerSpeechHook(callback: Callable[[], None]) -> None:
 	"""Registers a callback to be invoked before the cues module speaks."""
-	global _on_before_speech
-	_on_before_speech = callback
+	global _onBeforeSpeech
+	_onBeforeSpeech = callback
 
 
-def unregister_speech_hook() -> None:
+def unregisterSpeechHook() -> None:
 	"""Unregisters the speech hook."""
-	global _on_before_speech
-	_on_before_speech = None
+	global _onBeforeSpeech
+	_onBeforeSpeech = None

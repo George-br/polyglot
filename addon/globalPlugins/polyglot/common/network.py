@@ -20,7 +20,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def retry_on_network_error(
+def retryOnNetworkError(
 	attempts: int = 3, delay: float = 0.5, backoff: float = 1.5
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
 	"""
@@ -32,62 +32,63 @@ def retry_on_network_error(
 	def decorator(func: Callable[P, R]) -> Callable[P, R]:
 		@functools.wraps(func)
 		def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-			current_delay = delay
-			last_exception: Exception | None = None
+			currentDelay = delay
+			lastException: Exception | None = None
 			for attempt in range(attempts):
 				try:
 					return func(*args, **kwargs)
 				# Catch pure network-level errors.
 				except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-					last_exception = e
-					log_message_prefix = (
+					lastException = e
+					logMessagePrefix = (
 						f"Network error on attempt {attempt + 1}/{attempts} for {func.__name__}"
 					)
 				# Catch all HTTP errors and determine internally if they are retryable.
 				except requests.exceptions.HTTPError as e:
-					status_code = e.response.status_code
+					statusCode = e.response.status_code
 					# Define which HTTP status codes are retryable.
-					retryable_status_codes = {408, 429}  # 408: Request Time-out, 429: Too Many Requests
-					if status_code >= 500 or status_code in retryable_status_codes:
+					retryableStatusCodes = {408, 429}  # 408: Request Time-out, 429: Too Many Requests
+					if statusCode >= 500 or statusCode in retryableStatusCodes:
 						# If it's a retryable error, log it and prepare for the next loop.
-						last_exception = e
-						log_message_prefix = f"Retryable HTTP {status_code} on attempt {attempt + 1}/{attempts} for {func.__name__}"
+						lastException = e
+						logMessagePrefix = f"Retryable HTTP {statusCode} on attempt {attempt + 1}/{attempts} for {func.__name__}"
 					else:
 						# If it's a non-retryable HTTP error (e.g., 400, 403), stop trying and re-raise immediately.
-						# send_request will then catch this exception and wrap it in our custom type.
+						# sendRequest will then catch this exception and wrap it in our custom type.
 						raise e
 				# If this is the last attempt, break the loop to prepare for the final wrapped exception.
 				if attempt + 1 >= attempts:
-					log.error(f"{func.__name__} failed after {attempts} attempts.", exc_info=last_exception)
+					log.error(f"{func.__name__} failed after {attempts} attempts.", exc_info=lastException)
 					break
 				# Log a warning and wait for the next retry.
-				log.warning(f"{log_message_prefix}: {last_exception}. Retrying in {current_delay:.1f}s...")
-				time.sleep(current_delay)
-				current_delay *= backoff
+				log.warning(f"{logMessagePrefix}: {lastException}. Retrying in {currentDelay:.1f}s...")
+				time.sleep(currentDelay)
+				currentDelay *= backoff
 			# After all retries fail, wrap the last caught exception into our own user-friendly exception type.
-			assert last_exception is not None
-			if isinstance(last_exception, requests.exceptions.HTTPError):
+			assert lastException is not None
+			if isinstance(lastException, requests.exceptions.HTTPError):
 				raise ApiResponseError(
 					_(
 						"Service temporarily unavailable or timed out. Please try again later. (HTTP {code})"
-					).format(code=last_exception.response.status_code)
-				) from last_exception
-			elif isinstance(last_exception, requests.exceptions.Timeout):
+					).format(code=lastException.response.status_code)
+				) from lastException
+			elif isinstance(lastException, requests.exceptions.Timeout):
 				raise NetworkConnectionError(
 					_("Request to translation service timed out")
-				) from last_exception
+				) from lastException
 			else:
+				# Translators: Error message for generic network connection failures. {error} is the detailed error description.
 				raise NetworkConnectionError(
-					_("Network connection error: {error}").format(error=last_exception)
-				) from last_exception
+					_("Network connection error: {error}").format(error=lastException)
+				) from lastException
 
 		return wrapper
 
 	return decorator
 
 
-@retry_on_network_error()
-def send_request(
+@retryOnNetworkError()
+def sendRequest(
 	method: str,
 	url: str,
 	headers: dict[str, str] | None = None,
@@ -97,17 +98,17 @@ def send_request(
 ) -> str:
 	"""
 	Sends an HTTP(S) request using the `requests` library.
-	This function is protected by the `@retry_on_network_error` decorator
+	This function is protected by the `@retryOnNetworkError` decorator
 	and is only responsible for a single request attempt and handling non-retryable business errors.
 	"""
-	final_headers = headers.copy() if headers else {}
-	if "User-Agent" not in final_headers:
-		final_headers["User-Agent"] = "Mozilla/5.0"
+	finalHeaders = headers.copy() if headers else {}
+	if "User-Agent" not in finalHeaders:
+		finalHeaders["User-Agent"] = "Mozilla/5.0"
 	try:
 		response = requests.request(
 			method=method,
 			url=url,
-			headers=final_headers,
+			headers=finalHeaders,
 			data=data,
 			timeout=timeout,
 			proxies=cast(Any, proxies),
@@ -121,15 +122,16 @@ def send_request(
 		log.error(
 			f"Non-retryable HTTP error occurred: {e.response.status_code} {e.response.reason}", exc_info=True
 		)
-		status_code = e.response.status_code
-		if status_code == 403:
+		statusCode = e.response.status_code
+		if statusCode == 403:
 			raise AuthenticationError(_("Authentication failed. Please check your API key.")) from e
-		if status_code == 456:
+		if statusCode == 456:
 			raise ApiResponseError(_("Monthly translation quota has been reached.")) from e
 		# For all other non-retryable 4xx errors.
-		error_details = e.response.text[:200]
+		errorDetails = e.response.text[:200]
+		# Translators: Error message for HTTP failures. {code} is the HTTP status code, {reason} is the status message, and {details} is the error body.
 		raise ApiResponseError(
 			_("Service returned an error: {code} {reason}. Details: {details}").format(
-				code=status_code, reason=e.response.reason, details=error_details
+				code=statusCode, reason=e.response.reason, details=errorDetails
 			)
 		) from e

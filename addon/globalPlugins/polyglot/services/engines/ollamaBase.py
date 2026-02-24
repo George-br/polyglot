@@ -39,23 +39,23 @@ class OllamaBaseEngine(BaseHttpEngine):
 	PROMPT_FLUENT_USER = 'Translate into $to_name:\n"""\n$text\n"""'
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "en"
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		return 512
 
 	@property
-	def reports_detected_language(self) -> bool:
+	def reportsDetectedLanguage(self) -> bool:
 		return True
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = [
 			"auto",
 			"en",
 			"zh-CN",
@@ -74,10 +74,10 @@ class OllamaBaseEngine(BaseHttpEngine):
 			"ar",
 			"he",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{
@@ -117,100 +117,100 @@ class OllamaBaseEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_ui_states(self, all_configs: dict[str, Any]) -> dict[str, Any]:
-		states = super().get_ui_states(all_configs)
-		prompt_mode = all_configs.get("promptMode")
-		is_custom_mode = prompt_mode == "custom"
-		states["customSystemPrompt"] = {"visible": is_custom_mode}
-		states["customUserPrompt"] = {"visible": is_custom_mode}
+	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, Any]:
+		states = super().getUiStates(allConfigs)
+		promptMode = allConfigs.get("promptMode")
+		isCustomMode = promptMode == "custom"
+		states["customSystemPrompt"] = {"visible": isCustomMode}
+		states["customUserPrompt"] = {"visible": isCustomMode}
 		return states
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		api_url = config.get("apiUrl", "").strip()
-		model_name = config.get("modelName", "").strip()
-		if not api_url or not model_name:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		apiUrl = config.get("apiUrl", "").strip()
+		modelName = config.get("modelName", "").strip()
+		if not apiUrl or not modelName:
 			raise AuthenticationError(_("Ollama API URL and Model Name are required."))
 
-		prompt_mode = config.get("promptMode", "json_concise")
+		promptMode = config.get("promptMode", "json_concise")
 
-		system_prompt = ""
-		user_prompt_template = ""
+		systemPrompt = ""
+		userPromptTemplate = ""
 
-		if prompt_mode == "custom":
-			system_prompt = config.get("customSystemPrompt") or self.PROMPT_FLUENT_SYSTEM
-			user_prompt_template = config.get("customUserPrompt") or self.PROMPT_FLUENT_USER
-		elif prompt_mode == "simple":
-			system_prompt = self.PROMPT_SIMPLE_SYSTEM
-			user_prompt_template = self.PROMPT_SIMPLE_USER
-		elif prompt_mode == "json_structured":
-			system_prompt = self.PROMPT_JSON_STRUCTURED_SYSTEM
-			user_prompt_template = self.PROMPT_JSON_STRUCTURED_USER
-		elif prompt_mode == "fluent":
-			system_prompt = self.PROMPT_FLUENT_SYSTEM
-			user_prompt_template = self.PROMPT_FLUENT_USER
+		if promptMode == "custom":
+			systemPrompt = config.get("customSystemPrompt") or self.PROMPT_FLUENT_SYSTEM
+			userPromptTemplate = config.get("customUserPrompt") or self.PROMPT_FLUENT_USER
+		elif promptMode == "simple":
+			systemPrompt = self.PROMPT_SIMPLE_SYSTEM
+			userPromptTemplate = self.PROMPT_SIMPLE_USER
+		elif promptMode == "json_structured":
+			systemPrompt = self.PROMPT_JSON_STRUCTURED_SYSTEM
+			userPromptTemplate = self.PROMPT_JSON_STRUCTURED_USER
+		elif promptMode == "fluent":
+			systemPrompt = self.PROMPT_FLUENT_SYSTEM
+			userPromptTemplate = self.PROMPT_FLUENT_USER
 		else:  # Default to json_concise
-			system_prompt = self.PROMPT_JSON_CONCISE_SYSTEM
-			user_prompt_template = self.PROMPT_JSON_CONCISE_USER
+			systemPrompt = self.PROMPT_JSON_CONCISE_SYSTEM
+			userPromptTemplate = self.PROMPT_JSON_CONCISE_USER
 
-		api_key = config.get("apiKey", "").strip()
-		lang_to_name = languages.get_language_dict_for_codes([lang_to]).get(lang_to, lang_to)
+		apiKey = config.get("apiKey", "").strip()
+		langToName = languages.getLanguageDictForCodes([langTo]).get(langTo, langTo)
 
-		final_user_prompt = user_prompt_template.replace("$to_name", lang_to_name).replace("$text", text)
+		finalUserPrompt = userPromptTemplate.replace("$to_name", langToName).replace("$text", text)
 
 		payload = {
-			"model": model_name,
-			"system": system_prompt,
-			"prompt": final_user_prompt,
+			"model": modelName,
+			"system": systemPrompt,
+			"prompt": finalUserPrompt,
 			"stream": False,
 		}
 
 		headers = {"Content-Type": "application/json"}
-		if api_key:
-			headers["Authorization"] = f"Bearer {api_key}"
+		if apiKey:
+			headers["Authorization"] = f"Bearer {apiKey}"
 
 		return {
 			"method": "POST",
-			"url": api_url,
+			"url": apiUrl,
 			"headers": headers,
 			"data": json.dumps(payload).encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
-		outer_data = json.loads(response_body)
+	def _parseResponse(self, responseBody: str) -> dict:
+		outerData = json.loads(responseBody)
 
-		if "error" in outer_data:
-			raise OllamaApiError(outer_data["error"])
+		if "error" in outerData:
+			raise OllamaApiError(outerData["error"])
 
-		model_response_str = outer_data.get("response")
+		modelResponseStr = outerData.get("response")
 
-		if not model_response_str:
+		if not modelResponseStr:
 			raise OllamaApiError(_("API response did not contain a 'response' field."))
 
 		try:
-			clean_str = model_response_str.strip()
-			if clean_str.startswith("```json"):
-				clean_str = clean_str[7:]
-			elif clean_str.startswith("```"):
-				clean_str = clean_str[3:]
-			if clean_str.endswith("```"):
-				clean_str = clean_str[:-3]
+			cleanStr = modelResponseStr.strip()
+			if cleanStr.startswith("```json"):
+				cleanStr = cleanStr[7:]
+			elif cleanStr.startswith("```"):
+				cleanStr = cleanStr[3:]
+			if cleanStr.endswith("```"):
+				cleanStr = cleanStr[:-3]
 
-			clean_str = clean_str.strip()
+			cleanStr = cleanStr.strip()
 
-			inner_data = json.loads(clean_str)
-			translated_text = inner_data.get("translation")
-			detected_lang = inner_data.get("detected_language")
+			innerData = json.loads(cleanStr)
+			translatedText = innerData.get("translation")
+			detectedLang = innerData.get("detected_language")
 
-			if translated_text is not None:
+			if translatedText is not None:
 				return {
-					"translation": str(translated_text).strip(),
-					"lang_detected": str(detected_lang).strip() if detected_lang else None,
+					"translation": str(translatedText).strip(),
+					"langDetected": str(detectedLang).strip() if detectedLang else None,
 				}
 
-			return {"translation": clean_str, "lang_detected": None}
+			return {"translation": cleanStr, "langDetected": None}
 
 		except (json.JSONDecodeError, KeyError, TypeError):
 			log.warning(
-				f"Could not parse model's response as JSON. Treating as plain text. Response: {model_response_str}"
+				f"Could not parse model's response as JSON. Treating as plain text. Response: {modelResponseStr}"
 			)
-			return {"translation": model_response_str.strip(), "lang_detected": None}
+			return {"translation": modelResponseStr.strip(), "langDetected": None}

@@ -1,4 +1,4 @@
-# -*- coding-utf-8 -*-
+# -*- coding: utf-8 -*-
 
 import json
 from typing import Any
@@ -47,7 +47,7 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 	}
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		"""
 		Set to 4000 to maintain a safe token window and prevent timeout issues
 		with large documents across various LLM providers.
@@ -55,19 +55,19 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 		return 4000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "en"
 
 	@property
-	def reports_detected_language(self) -> bool:
+	def reportsDetectedLanguage(self) -> bool:
 		return True
 
-	def get_supported_languages(self) -> dict[str, str]:
-		supported_codes = [
+	def getSupportedLanguages(self) -> dict[str, str]:
+		supportedCodes = [
 			"auto",
 			"en",
 			"zh-CN",
@@ -92,10 +92,10 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 			"tr",
 			"hi",
 		]
-		return languages.get_language_dict_for_codes(supported_codes)
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def get_config_spec(self) -> list[dict[str, Any]]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict[str, Any]]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{
@@ -146,120 +146,120 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_ui_states(self, all_configs: dict[str, Any]) -> dict[str, Any]:
-		states = super().get_ui_states(all_configs)
-		is_custom_model = all_configs.get("modelNamePreset") == "custom"
-		is_custom_prompt = all_configs.get("promptMode") == "custom"
-		states["modelNameCustom"] = {"visible": is_custom_model}
-		states["customSystemPrompt"] = {"visible": is_custom_prompt}
-		states["customUserPrompt"] = {"visible": is_custom_prompt}
+	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, Any]:
+		states = super().getUiStates(allConfigs)
+		isCustomModel = allConfigs.get("modelNamePreset") == "custom"
+		isCustomPrompt = allConfigs.get("promptMode") == "custom"
+		states["modelNameCustom"] = {"visible": isCustomModel}
+		states["customSystemPrompt"] = {"visible": isCustomPrompt}
+		states["customUserPrompt"] = {"visible": isCustomPrompt}
 		return states
 
-	def _build_request_params(
-		self, text: str, lang_from: str, lang_to: str, config: dict[str, Any]
+	def _buildRequestParams(
+		self, text: str, langFrom: str, langTo: str, config: dict[str, Any]
 	) -> dict[str, Any]:
-		api_url = config.get("apiUrl", "https://openrouter.ai/api/v1/chat/completions").strip()
-		if not api_url:
+		apiUrl = config.get("apiUrl", "https://openrouter.ai/api/v1/chat/completions").strip()
+		if not apiUrl:
 			raise AuthenticationError(_("OpenRouter API URL is not configured."))
-		api_key = config.get("apiKey", "").strip()
-		if not api_key:
+		apiKey = config.get("apiKey", "").strip()
+		if not apiKey:
 			raise AuthenticationError(_("API Key for OpenRouter is not configured."))
 
-		model_preset = config.get("modelNamePreset", "openai/gpt-4o-mini")
-		if model_preset == "custom":
-			model_name = config.get("modelNameCustom", "").strip()
-			if not model_name:
+		modelPreset = config.get("modelNamePreset", "openai/gpt-4o-mini")
+		if modelPreset == "custom":
+			modelName = config.get("modelNameCustom", "").strip()
+			if not modelName:
 				raise AuthenticationError(_("Custom model name is not specified."))
 		else:
-			model_name = model_preset
+			modelName = modelPreset
 
-		prompt_mode = config.get("promptMode", "json_structured")
-		if prompt_mode == "custom":
-			system_prompt = config.get("customSystemPrompt") or self.PROMPT_FLUENT_SYSTEM
-			user_prompt_template = config.get("customUserPrompt") or self.PROMPT_FLUENT_USER
-		elif prompt_mode == "simple":
-			system_prompt = self.PROMPT_SIMPLE_SYSTEM
-			user_prompt_template = self.PROMPT_SIMPLE_USER
-		elif prompt_mode == "fluent":
-			system_prompt = self.PROMPT_FLUENT_SYSTEM
-			user_prompt_template = self.PROMPT_FLUENT_USER
+		promptMode = config.get("promptMode", "json_structured")
+		if promptMode == "custom":
+			systemPrompt = config.get("customSystemPrompt") or self.PROMPT_FLUENT_SYSTEM
+			userPromptTemplate = config.get("customUserPrompt") or self.PROMPT_FLUENT_USER
+		elif promptMode == "simple":
+			systemPrompt = self.PROMPT_SIMPLE_SYSTEM
+			userPromptTemplate = self.PROMPT_SIMPLE_USER
+		elif promptMode == "fluent":
+			systemPrompt = self.PROMPT_FLUENT_SYSTEM
+			userPromptTemplate = self.PROMPT_FLUENT_USER
 		else:  # Default to structured JSON
-			system_prompt = self.PROMPT_JSON_STRUCTURED_SYSTEM
-			user_prompt_template = self.PROMPT_JSON_STRUCTURED_USER
+			systemPrompt = self.PROMPT_JSON_STRUCTURED_SYSTEM
+			userPromptTemplate = self.PROMPT_JSON_STRUCTURED_USER
 
-		lang_to_name = languages.get_language_dict_for_codes([lang_to]).get(lang_to, lang_to)
-		final_user_prompt = user_prompt_template.replace("$to_name", lang_to_name).replace("$text", text)
+		langToName = languages.getLanguageDictForCodes([langTo]).get(langTo, langTo)
+		finalUserPrompt = userPromptTemplate.replace("$to_name", langToName).replace("$text", text)
 
 		payload = {
-			"model": model_name,
+			"model": modelName,
 			"messages": [
-				{"role": "system", "content": system_prompt},
-				{"role": "user", "content": final_user_prompt},
+				{"role": "system", "content": systemPrompt},
+				{"role": "user", "content": finalUserPrompt},
 			],
 			"stream": False,
 		}
 
 		headers = {
 			"Content-Type": "application/json",
-			"Authorization": f"Bearer {api_key}",
+			"Authorization": f"Bearer {apiKey}",
 			"HTTP-Referer": "https://github.com/nvaccess/nvda",
 			"X-Title": "NVDA Polyglot Add-on",
 		}
 
 		return {
 			"method": "POST",
-			"url": api_url,
+			"url": apiUrl,
 			"headers": headers,
 			"data": json.dumps(payload).encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict[str, Any]:
+	def _parseResponse(self, responseBody: str) -> dict[str, Any]:
 		try:
-			outer_data = json.loads(response_body)
+			outerData = json.loads(responseBody)
 		except json.JSONDecodeError as e:
 			log.error(f"Failed to parse outer JSON response from '{self.id}'.", exc_info=True)
 			raise self.OpenRouterApiError(_("Failed to parse API response.")) from e
 
-		if "error" in outer_data:
-			error_message = outer_data["error"].get("message", "Unknown API error")
-			raise self.OpenRouterApiError(error_message)
+		if "error" in outerData:
+			errorMessage = outerData["error"].get("message", "Unknown API error")
+			raise self.OpenRouterApiError(errorMessage)
 
 		try:
-			model_response_str = outer_data["choices"][0]["message"]["content"]
-			prompt_mode = config.get_config()["engines"][self.id].get("promptMode", "json_structured")
+			modelResponseStr = outerData["choices"][0]["message"]["content"]
+			promptMode = config.getConfig()["engines"][self.id].get("promptMode", "json_structured")
 
-			if prompt_mode in ["json_structured", "custom"]:
+			if promptMode in ["json_structured", "custom"]:
 				try:
-					clean_str = model_response_str.strip()
-					if clean_str.startswith("```json"):
-						clean_str = clean_str[7:]
-					elif clean_str.startswith("```"):
-						clean_str = clean_str[3:]
+					cleanStr = modelResponseStr.strip()
+					if cleanStr.startswith("```json"):
+						cleanStr = cleanStr[7:]
+					elif cleanStr.startswith("```"):
+						cleanStr = cleanStr[3:]
 
-					if clean_str.endswith("```"):
-						clean_str = clean_str[:-3]
-					clean_str = clean_str.strip()
+					if cleanStr.endswith("```"):
+						cleanStr = cleanStr[:-3]
+					cleanStr = cleanStr.strip()
 
-					inner_data = json.loads(clean_str)
-					translated_text = inner_data.get("translation")
-					detected_lang = inner_data.get("detected_language")
+					innerData = json.loads(cleanStr)
+					translatedText = innerData.get("translation")
+					detectedLang = innerData.get("detected_language")
 
-					if translated_text is None:
+					if translatedText is None:
 						log.warning(
 							f"'{self.id}' response was JSON but missing 'translation' key. Falling back."
 						)
-						return {"translation": model_response_str.strip(), "lang_detected": None}
+						return {"translation": modelResponseStr.strip(), "langDetected": None}
 
 					return {
-						"translation": str(translated_text).strip(),
-						"lang_detected": str(detected_lang).strip() if detected_lang else None,
+						"translation": str(translatedText).strip(),
+						"langDetected": str(detectedLang).strip() if detectedLang else None,
 					}
 				except (json.JSONDecodeError, KeyError, TypeError) as e:
 					log.warning(
 						f"Could not parse model's response as JSON for '{self.id}'. Treating as plain text. Error: {e}"
 					)
-					return {"translation": model_response_str.strip(), "lang_detected": None}
-			return {"translation": model_response_str.strip(), "lang_detected": None}
+					return {"translation": modelResponseStr.strip(), "langDetected": None}
+			return {"translation": modelResponseStr.strip(), "langDetected": None}
 		except (KeyError, IndexError) as e:
 			log.error(f"Could not extract message content from '{self.id}' response.", exc_info=True)
 			raise self.OpenRouterApiError(_("Invalid API response structure.")) from e

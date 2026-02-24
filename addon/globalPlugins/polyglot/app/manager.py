@@ -11,7 +11,7 @@ from ..common import config
 from ..common.cache import TranslationCache
 from ..common.exceptions import EngineError
 from ..common import languages
-from ..services import engine_manager
+from ..services import engineManager
 from .task import TranslationTask
 from ..common import cues
 from ..common.cues import CueType
@@ -22,62 +22,65 @@ OnSuccessCallback = Callable[[str], None] | None
 class TranslationManager:
 	# Annotations for instance variables defined and managed by this class
 	cache: TranslationCache
-	last_translation: str | None
-	consecutive_failures: int
-	_current_task: TranslationTask | None
-	auto_translate_enabled: bool
+	lastTranslation: str | None
+	consecutiveFailures: int
+	_currentTask: TranslationTask | None
+	isAutoTranslateEnabled: bool
 
 	def __init__(self) -> None:
 		super().__init__()
 		self.cache = TranslationCache()
-		self.last_translation = None
-		self.consecutive_failures = 0
-		self._current_task = None
-		self.auto_translate_enabled = False
+		self.lastTranslation = None
+		self.consecutiveFailures = 0
+		self._currentTask = None
+		self.isAutoTranslateEnabled = False
 
-	def clear_cache(self) -> None:
+	def clearCache(self) -> None:
+		"""Clears all cached translation entries."""
 		log.info("Clearing cache via TranslationManager.")
 		self.cache.clear()
 
-	def toggle_auto_translate(self) -> bool:
-		self.reset_consecutive_failures()
-		self.auto_translate_enabled = not self.auto_translate_enabled
-		log.info(f"Runtime auto-translate toggled to: {self.auto_translate_enabled}")
-		return self.auto_translate_enabled
+	def toggleAutoTranslate(self) -> bool:
+		"""Toggles auto-translation on or off and returns the new state."""
+		self.resetConsecutiveFailures()
+		self.isAutoTranslateEnabled = not self.isAutoTranslateEnabled
+		log.info(f"Runtime auto-translate toggled to: {self.isAutoTranslateEnabled}")
+		return self.isAutoTranslateEnabled
 
-	def swap_languages(self) -> tuple[bool, str]:
+	def swapLanguages(self) -> tuple[bool, str]:
 		"""
 		Swaps the source and target languages in the configuration.
 
 		Returns:
 			A tuple containing a boolean for success and a user-facing message.
 		"""
-		conf = config.get_config()
-		engine_id = conf["engine"]
+		conf = config.getConfig()
+		engineId = conf["engine"]
 		try:
-			current_engine = engine_manager.get_engine_by_id(engine_id)
+			currentEngine = engineManager.getEngineById(engineId)
 		except (ValueError, NotImplementedError):
 			return (False, _("Invalid engine configuration."))
-		if engine_id not in conf["engines"]:
-			conf["engines"][engine_id] = {}
-		engine_conf = conf["engines"][engine_id]
-		current_from = engine_conf.get("langFrom", current_engine.default_source_language)
-		current_to = engine_conf.get("langTo", current_engine.default_target_language)
-		auto_detect_code = current_engine.auto_detect_code
-		if current_from == auto_detect_code:
-			log.warning(f"Language swap aborted. Cannot set '{auto_detect_code}' as target language.")
+		if engineId not in conf["engines"]:
+			conf["engines"][engineId] = {}
+		engineConf = conf["engines"][engineId]
+		currentFrom = engineConf.get("langFrom", currentEngine.defaultSourceLanguage)
+		currentTo = engineConf.get("langTo", currentEngine.defaultTargetLanguage)
+		autoDetectCode = currentEngine.autoDetectCode
+		if currentFrom == autoDetectCode:
+			log.warning(f"Language swap aborted. Cannot set '{autoDetectCode}' as target language.")
 			return (False, _("Swap failed: 'Auto-detect' cannot be the target language."))
-		engine_conf["langFrom"] = current_to
-		engine_conf["langTo"] = current_from
+		engineConf["langFrom"] = currentTo
+		engineConf["langTo"] = currentFrom
 		log.info(
-			f"Languages swapped for engine '{engine_id}'. New config: From={current_to}, To={current_from}"
+			f"Languages swapped for engine '{engineId}'. New config: From={currentTo}, To={currentFrom}"
 		)
+		# Translators: A message indicating that the source and target languages have been swapped. {source} is the new source language, {target} is the new target language.
 		message = _("Languages swapped: from {source} to {target}").format(
-			source=current_to, target=current_from
+			source=currentTo, target=currentFrom
 		)
 		return (True, message)
 
-	def cycle_language(self, target: str, forward: bool) -> tuple[bool, str]:
+	def cycleLanguage(self, target: str, forward: bool) -> tuple[bool, str]:
 		"""
 		Cycles the source or target language for the current engine.
 		The other side's language is excluded from the candidate list
@@ -90,45 +93,45 @@ class TranslationManager:
 		Returns:
 			A tuple containing a boolean for success and a user-facing message.
 		"""
-		conf = config.get_config()
-		engine_id = conf["engine"]
+		conf = config.getConfig()
+		engineId = conf["engine"]
 		try:
-			current_engine = engine_manager.get_engine_by_id(engine_id)
+			currentEngine = engineManager.getEngineById(engineId)
 		except (ValueError, NotImplementedError):
 			return (False, _("Invalid engine configuration."))
-		if engine_id not in conf["engines"]:
-			conf["engines"][engine_id] = {}
-		engine_conf = conf["engines"][engine_id]
-		all_langs = current_engine.get_supported_languages()
-		auto_code = current_engine.auto_detect_code
+		if engineId not in conf["engines"]:
+			conf["engines"][engineId] = {}
+		engineConf = conf["engines"][engineId]
+		allLangs = currentEngine.getSupportedLanguages()
+		autoCode = currentEngine.autoDetectCode
 		if target == "source":
-			config_key = "langFrom"
-			default_val = current_engine.default_source_language
-			other_code = engine_conf.get("langTo", current_engine.default_target_language)
-			lang_codes = [code for code in all_langs.keys() if code != other_code]
+			configKey = "langFrom"
+			defaultVal = currentEngine.defaultSourceLanguage
+			otherCode = engineConf.get("langTo", currentEngine.defaultTargetLanguage)
+			langCodes = [code for code in allLangs.keys() if code != otherCode]
 		else:
-			config_key = "langTo"
-			default_val = current_engine.default_target_language
-			other_code = engine_conf.get("langFrom", current_engine.default_source_language)
-			exclude = {auto_code} if auto_code else set()
-			if other_code != auto_code:
-				exclude.add(other_code)
-			lang_codes = [code for code in all_langs.keys() if code not in exclude]
-		if not lang_codes:
+			configKey = "langTo"
+			defaultVal = currentEngine.defaultTargetLanguage
+			otherCode = engineConf.get("langFrom", currentEngine.defaultSourceLanguage)
+			exclude = {autoCode} if autoCode else set()
+			if otherCode != autoCode:
+				exclude.add(otherCode)
+			langCodes = [code for code in allLangs.keys() if code not in exclude]
+		if not langCodes:
 			return (False, _("No languages available for cycling."))
-		current_code = engine_conf.get(config_key, default_val)
+		currentCode = engineConf.get(configKey, defaultVal)
 		try:
-			current_index = lang_codes.index(current_code)
+			currentIndex = langCodes.index(currentCode)
 		except ValueError:
-			current_index = 0
+			currentIndex = 0
 		step = 1 if forward else -1
-		new_index = (current_index + step) % len(lang_codes)
-		new_code = lang_codes[new_index]
-		engine_conf[config_key] = new_code
-		new_name = languages.ALL_LANGUAGES.get(new_code, new_code)
-		return (True, new_name)
+		newIndex = (currentIndex + step) % len(langCodes)
+		newCode = langCodes[newIndex]
+		engineConf[configKey] = newCode
+		newName = languages.ALL_LANGUAGES.get(newCode, newCode)
+		return (True, newName)
 
-	def cycle_engine(self, forward: bool) -> tuple[bool, str]:
+	def cycleEngine(self, forward: bool) -> tuple[bool, str]:
 		"""
 		Cycles the active translation engine.
 
@@ -138,216 +141,223 @@ class TranslationManager:
 		Returns:
 			A tuple containing a boolean for success and a user-facing message.
 		"""
-		all_engines = engine_manager.get_all_engines()
-		if not all_engines:
+		allEngines = engineManager.getAllEngines()
+		if not allEngines:
 			return (False, _("No translation engines available."))
-		conf = config.get_config()
-		current_id = conf["engine"]
-		engine_ids = [e.id for e in all_engines]
+		conf = config.getConfig()
+		currentId = conf["engine"]
+		engineIds = [e.id for e in allEngines]
 		try:
-			current_index = engine_ids.index(current_id)
+			currentIndex = engineIds.index(currentId)
 		except ValueError:
-			current_index = 0
+			currentIndex = 0
 		step = 1 if forward else -1
-		new_index = (current_index + step) % len(engine_ids)
-		new_engine = all_engines[new_index]
-		conf["engine"] = new_engine.id
-		return (True, new_engine.name)
+		newIndex = (currentIndex + step) % len(engineIds)
+		newEngine = allEngines[newIndex]
+		conf["engine"] = newEngine.id
+		return (True, newEngine.name)
 
-	def get_current_engine_and_language_info(self) -> str:
+	def getCurrentEngineAndLanguageInfo(self) -> str:
 		"""
 		Gets a formatted string of the current engine and languages for announcement,
 		"""
-		conf = config.get_config()
-		engine_id = conf["engine"]
-		engine_conf = conf["engines"].get(engine_id, {})
+		conf = config.getConfig()
+		engineId = conf["engine"]
+		engineConf = conf["engines"].get(engineId, {})
 		try:
-			current_engine = engine_manager.get_engine_by_id(engine_id)
-			lang_from_code = engine_conf.get("langFrom", current_engine.default_source_language)
-			lang_to_code = engine_conf.get("langTo", current_engine.default_target_language)
-			lang_from_desc = languages.ALL_LANGUAGES.get(lang_from_code, lang_from_code)
-			lang_to_desc = languages.ALL_LANGUAGES.get(lang_to_code, lang_to_code)
-			return _(f"{current_engine.name}, from {lang_from_desc} to {lang_to_desc}")
+			currentEngine = engineManager.getEngineById(engineId)
+			langFromCode = engineConf.get("langFrom", currentEngine.defaultSourceLanguage)
+			langToCode = engineConf.get("langTo", currentEngine.defaultTargetLanguage)
+			langFromDesc = languages.ALL_LANGUAGES.get(langFromCode, langFromCode)
+			langToDesc = languages.ALL_LANGUAGES.get(langToCode, langToCode)
+			# Translators: Announcement of the current translation engine and languages. {engine} is the engine name, {source} is the source language, {target} is the target language.
+			return _("{engine}, from {source} to {target}").format(
+				engine=currentEngine.name, source=langFromDesc, target=langToDesc
+			)
 		except (ValueError, NotImplementedError):
 			log.warning(
-				f"Could not get language announcement. Engine '{engine_id}' may be invalid or not fully implemented."
+				f"Could not get language announcement. Engine '{engineId}' may be invalid or not fully implemented."
 			)
 			return _("Languages not configured or current engine is invalid")
 
-	def terminate_all_tasks(self) -> None:
-		if self._current_task and self._current_task.is_alive():
+	def terminateAllTasks(self) -> None:
+		"""Cancels the active translation task, if any, and stops periodic cues."""
+		if self._currentTask and self._currentTask.is_alive():
 			log.info("Terminating active translation task.")
-			self._current_task.cancel()
-		cues.stop_periodic_cue()
-		self._current_task = None
+			self._currentTask.cancel()
+		cues.stopPeriodicCue()
+		self._currentTask = None
 
-	def reset_consecutive_failures(self) -> None:
+	def resetConsecutiveFailures(self) -> None:
+		"""Resets the consecutive failure counter to zero."""
 		log.debug("Consecutive failure count has been reset manually.")
-		self.consecutive_failures = 0
+		self.consecutiveFailures = 0
 
-	def get_current_languages(self) -> tuple[str | None, str | None]:
+	def getCurrentLanguages(self) -> tuple[str | None, str | None]:
 		"""
 		Gets the currently configured source and target languages.
 
 		Returns:
-			A tuple of (lang_from, lang_to), or (None, None) on error.
+			A tuple of (langFrom, langTo), or (None, None) on error.
 		"""
-		conf = config.get_config()
-		engine_id = conf["engine"]
-		engine_conf = conf["engines"].get(engine_id, {})
+		conf = config.getConfig()
+		engineId = conf["engine"]
+		engineConf = conf["engines"].get(engineId, {})
 		try:
-			current_engine = engine_manager.get_engine_by_id(engine_id)
-			lang_from = engine_conf.get("langFrom", current_engine.default_source_language)
-			lang_to = engine_conf.get("langTo", current_engine.default_target_language)
-			return (lang_from, lang_to)
+			currentEngine = engineManager.getEngineById(engineId)
+			langFrom = engineConf.get("langFrom", currentEngine.defaultSourceLanguage)
+			langTo = engineConf.get("langTo", currentEngine.defaultTargetLanguage)
+			return (langFrom, langTo)
 		except (ValueError, NotImplementedError):
-			log.warning(f"Could not get current languages. Engine '{engine_id}' may be invalid.")
+			log.warning(f"Could not get current languages. Engine '{engineId}' may be invalid.")
 			return (None, None)
 
-	def get_reverse_languages(self) -> tuple[str | None, str | None, str | None]:
+	def getReverseLanguages(self) -> tuple[str | None, str | None, str | None]:
 		"""
 		Checks if languages can be reversed and returns them if possible.
 
 		Returns:
-			A tuple of (new_lang_from, new_lang_to, error_message).
-			On success, error_message will be None.
+			A tuple of (new_lang_from, new_lang_to, errorMessage).
+			On success, errorMessage will be None.
 			On failure, the languages will be None.
 		"""
-		source_lang, target_lang = self.get_current_languages()
-		if not source_lang or not target_lang:
+		sourceLang, targetLang = self.getCurrentLanguages()
+		if not sourceLang or not targetLang:
 			return None, None, _("Languages not configured, cannot reverse.")
-		conf = config.get_config()  # Manager 内部使用自己的 config 是完全合理的
-		engine_id = conf["engine"]
+		conf = config.getConfig()
+		engineId = conf["engine"]
 		try:
-			current_engine = engine_manager.get_engine_by_id(engine_id)
-			if source_lang == current_engine.auto_detect_code:
+			currentEngine = engineManager.getEngineById(engineId)
+			if sourceLang == currentEngine.autoDetectCode:
 				return None, None, _("Reverse failed: 'Auto-detect' cannot be the target language.")
-			return target_lang, source_lang, None
+			return targetLang, sourceLang, None
 		except (ValueError, NotImplementedError):
 			return None, None, _("Current translation engine is invalid.")
 
-	def request_translation(
+	def requestTranslation(
 		self,
 		text: str | None,
-		is_manual: bool = True,
-		show_status: bool = True,
-		allow_copy: bool = True,
-		on_success: OnSuccessCallback = None,
-		lang_from: str | None = None,
-		lang_to: str | None = None,
+		isManual: bool = True,
+		showStatus: bool = True,
+		allowCopy: bool = True,
+		onSuccess: OnSuccessCallback = None,
+		langFrom: str | None = None,
+		langTo: str | None = None,
 	) -> None:
 		if not text or not text.strip():
-			if is_manual:
-				cues.speech.message(_("Nothing to translate"))
+			if isManual:
+				cues.Speech.message(_("Nothing to translate"))
 			return
-		conf = config.get_config()
-		engine_id = conf["engine"]
+		conf = config.getConfig()
+		engineId = conf["engine"]
 		try:
-			current_engine = engine_manager.get_engine_by_id(engine_id)
+			currentEngine = engineManager.getEngineById(engineId)
 		except (ValueError, NotImplementedError):
 			log.error(
-				f"Selected engine '{engine_id}' is not available or not fully implemented.", exc_info=True
+				f"Selected engine '{engineId}' is not available or not fully implemented.", exc_info=True
 			)
-			if is_manual:
-				cues.speech.message(
+			if isManual:
+				# Translators: Error message when the selected translation engine is not available or not configured. {engine} is the internal ID of the engine.
+				cues.Speech.message(
 					_("Error: Selected engine '{engine}' is unavailable or not configured.").format(
-						engine=engine_id
+						engine=engineId
 					)
 				)
 			return
-		if engine_id not in conf["engines"]:
-			conf["engines"][engine_id] = {}
-		engine_config = conf["engines"][engine_id].dict()
+		if engineId not in conf["engines"]:
+			conf["engines"][engineId] = {}
+		engineConfig = conf["engines"][engineId].dict()
 		try:
-			if lang_from is None:
-				lang_from = engine_config.get("langFrom", current_engine.default_source_language)
-			if lang_to is None:
-				lang_to = engine_config.get("langTo", current_engine.default_target_language)
+			if langFrom is None:
+				langFrom = engineConfig.get("langFrom", currentEngine.defaultSourceLanguage)
+			if langTo is None:
+				langTo = engineConfig.get("langTo", currentEngine.defaultTargetLanguage)
 		except NotImplementedError:
 			log.error(
-				f"Engine '{engine_id}' is missing required default language implementations.", exc_info=True
+				f"Engine '{engineId}' is missing required default language implementations.", exc_info=True
 			)
-			if is_manual:
-				cues.speech.message(_("Error: Engine '{engine}' is not configured.").format(engine=engine_id))
+			if isManual:
+				# Translators: Error message when the selected translation engine is not configured properly. {engine} is the internal ID of the engine.
+				cues.Speech.message(_("Error: Engine '{engine}' is not configured.").format(engine=engineId))
 			return
-		if is_manual and show_status:
-			cues.sound.play(CueType.START)
-		if self._current_task and self._current_task.is_alive():
+		if isManual and showStatus:
+			cues.Sound.play(CueType.START)
+		if self._currentTask and self._currentTask.is_alive():
 			log.info("A new translation request is overriding the previous one. Cancelling.")
-			self._current_task.cancel()
-			cues.stop_periodic_cue()
-		cache_key = self.cache.build_key(lang_from, lang_to, text)
-		cached_result = self.cache.get(cache_key)
-		if cached_result:
-			log.info(f"Cache hit for key {cache_key}. Returning cached result.")
-			self._on_translation_complete(
-				{"translation": cached_result, "error": None},
-				is_manual=is_manual,
-				allow_copy=allow_copy,
-				on_success=on_success,
+			self._currentTask.cancel()
+			cues.stopPeriodicCue()
+		cacheKey = self.cache.buildKey(langFrom, langTo, text)
+		cachedResult = self.cache.get(cacheKey)
+		if cachedResult:
+			log.info(f"Cache hit for key {cacheKey}. Returning cached result.")
+			self._onTranslationComplete(
+				{"translation": cachedResult, "error": None},
+				isManual=isManual,
+				allowCopy=allowCopy,
+				onSuccess=onSuccess,
 			)
 			return
-		if is_manual and show_status:
-			cues.sound.start_periodic(
+		if isManual and showStatus:
+			cues.Sound.startPeriodic(
 				CueType.WAITING,
-				interval_ms=1200,
-				delay_ms=600,
+				intervalMs=1200,
+				delayMs=600,
 			)
 
 		def callback(result: dict[str, Any]) -> None:
-			self._on_translation_complete(
-				result, is_manual=is_manual, allow_copy=allow_copy, on_success=on_success
+			self._onTranslationComplete(
+				result, isManual=isManual, allowCopy=allowCopy, onSuccess=onSuccess
 			)
 
 		task = TranslationTask(
-			engine_id=engine_id,
+			engineId=engineId,
 			text=text,
-			lang_from=lang_from,
-			lang_to=lang_to,
+			langFrom=langFrom,
+			langTo=langTo,
 			cache=self.cache,
-			on_complete=callback,
-			is_manual=is_manual,
-			engine_config=engine_config,
+			onComplete=callback,
+			isManual=isManual,
+			engineConfig=engineConfig,
 		)
-		self._current_task = task
+		self._currentTask = task
 		task.start()
 
-	def _on_translation_complete(
-		self, result: dict[str, Any], is_manual: bool, allow_copy: bool, on_success: OnSuccessCallback
+	def _onTranslationComplete(
+		self, result: dict[str, Any], isManual: bool, allowCopy: bool, onSuccess: OnSuccessCallback
 	) -> None:
-		cues.stop_periodic_cue()
+		cues.stopPeriodicCue()
 
 		def task() -> None:
 			error = result.get("error")
 			if error:
 				prefix = _("Translation failed: ")
-				error_message = (
+				errorMessage = (
 					f"{prefix}{error}"
 					if isinstance(error, EngineError)
 					else f"{prefix}{_('An unknown error occurred')}"
 				)
-				cues.speech.message(error_message)
-				if not is_manual:
-					self.consecutive_failures += 1
-					if self.consecutive_failures >= 3:
+				cues.Speech.message(errorMessage)
+				if not isManual:
+					self.consecutiveFailures += 1
+					if self.consecutiveFailures >= 3:
 						log.warning("Disabling auto-translation due to 3 consecutive failures.")
-						self.auto_translate_enabled = False
-						self.consecutive_failures = 0
+						self.isAutoTranslateEnabled = False
+						self.consecutiveFailures = 0
 						queueHandler.queueFunction(
 							queueHandler.eventQueue,
-							cues.speech.message,
+							cues.Speech.message,
 							_("Auto-translation disabled due to repeated failures."),
 						)
 			else:
-				self.consecutive_failures = 0
+				self.consecutiveFailures = 0
 				translation = result["translation"]
 				log.info(f"Translation successful. Result: '{translation[:50]}...'")
-				self.last_translation = translation
-				if on_success:
-					on_success(translation)
+				self.lastTranslation = translation
+				if onSuccess:
+					onSuccess(translation)
 				else:
-					cues.speech.message(translation)
-				if is_manual and allow_copy and config.get_config()["copyResult"]:
+					cues.Speech.message(translation)
+				if isManual and allowCopy and config.getConfig()["copyResult"]:
 					api.copyToClip(translation)
 
 		queueHandler.queueFunction(queueHandler.eventQueue, task)

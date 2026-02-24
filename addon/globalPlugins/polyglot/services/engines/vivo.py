@@ -10,7 +10,7 @@ from logHandler import log
 from ...common import languages
 from ..engine import BaseHttpEngine
 from ...common.exceptions import ApiResponseError, AuthenticationError, EngineError, NetworkConnectionError
-from . import _vivo_auth as vivo_auth
+from . import _vivoAuth as vivoAuth
 
 addonHandler.initTranslation()
 
@@ -26,7 +26,7 @@ class VivoTranslateEngine(BaseHttpEngine):
 	}
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		"""
 		Empirical testing (EN->ZH) revealed a limit of 5,001 characters.
 		It uses 'application/x-www-form-urlencoded'. To avoid payload bloat
@@ -35,20 +35,20 @@ class VivoTranslateEngine(BaseHttpEngine):
 		return 3000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		"""This engine does not support automatic language detection."""
 		return None
 
 	@property
-	def default_source_language(self) -> str:
+	def defaultSourceLanguage(self) -> str:
 		return "en"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "zh-CHS"
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{"id": "nvdacnUser", "label": _("NVDACN Username"), "type": "text", "default": ""},
@@ -57,19 +57,19 @@ class VivoTranslateEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_supported_languages(self) -> dict:
-		supported_codes = ["zh-CHS", "en", "ja", "ko"]
-		return languages.get_language_dict_for_codes(supported_codes)
+	def getSupportedLanguages(self) -> dict:
+		supportedCodes = ["zh-CHS", "en", "ja", "ko"]
+		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		nvdacn_user = config.get("nvdacnUser")
-		nvdacn_pass = config.get("nvdacnPass")
-		if not nvdacn_user or not nvdacn_pass:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		nvdacnUser = config.get("nvdacnUser")
+		nvdacnPass = config.get("nvdacnPass")
+		if not nvdacnUser or not nvdacnPass:
 			raise AuthenticationError(_("NVDACN username and password must be provided in settings."))
 
 		uri = "/translation/query/self"
 		try:
-			headers = vivo_auth.gen_sign_headers(nvdacn_user, nvdacn_pass, "POST", uri, {})
+			headers = vivoAuth.genSignHeaders(nvdacnUser, nvdacnPass, "POST", uri, {})
 			headers["Content-Type"] = "application/x-www-form-urlencoded"
 		except NetworkConnectionError as e:
 			log.error("Failed to connect to NVDACN authentication server.", exc_info=True)
@@ -79,13 +79,14 @@ class VivoTranslateEngine(BaseHttpEngine):
 				)
 			) from e
 		except AuthenticationError as e:
+			# Translators: Error message when authentication with the translation service fails. {error} is the detailed error description.
 			raise EngineError(_("Authentication failed: {error}").format(error=str(e))) from e
 		except Exception as e:
 			raise EngineError(_("An unknown error occurred while generating authentication info.")) from e
 
-		body_params = {
-			"from": lang_from,
-			"to": lang_to,
+		bodyParams = {
+			"from": langFrom,
+			"to": langTo,
 			"text": text,
 			"app": "test",
 			"requestId": str(uuid.uuid4()),
@@ -94,17 +95,17 @@ class VivoTranslateEngine(BaseHttpEngine):
 			"method": "POST",
 			"url": self.API_URL,
 			"headers": headers,
-			"data": urllib.parse.urlencode(body_params).encode("utf-8"),
+			"data": urllib.parse.urlencode(bodyParams).encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
-		result = json.loads(response_body)
+	def _parseResponse(self, responseBody: str) -> dict:
+		result = json.loads(responseBody)
 		if result.get("code") == 0 and "data" in result:
-			translated_text = result["data"].get("translation")
-			if translated_text is None:
+			translatedText = result["data"].get("translation")
+			if translatedText is None:
 				raise ApiResponseError(_("API response successful but did not contain a translation result."))
-			return {"translation": translated_text, "lang_detected": None}
+			return {"translation": translatedText, "langDetected": None}
 		else:
-			error_code = result.get("code")
-			error_message = self.ERROR_CODES.get(error_code, result.get("msg", _("Unknown API error")))
-			raise ApiResponseError(f"{error_message} (Code: {error_code or 'N/A'})")
+			errorCode = result.get("code")
+			errorMessage = self.ERROR_CODES.get(errorCode, result.get("msg", _("Unknown API error")))
+			raise ApiResponseError(f"{errorMessage} (Code: {errorCode or 'N/A'})")

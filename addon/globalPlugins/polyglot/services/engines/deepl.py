@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 import addonHandler
 from logHandler import log
@@ -25,19 +25,19 @@ class DeepLEngine(BaseHttpEngine):
 	FORMALITY_SUPPORTED_LANGUAGES = {"DE", "IT", "ES", "PL", "RU", "FR", "PT-PT", "NL", "JA", "PT-BR"}
 
 	@property
-	def max_request_length(self) -> int:
+	def maxRequestLength(self) -> int:
 		return 10000
 
 	@property
-	def auto_detect_code(self) -> str | None:
+	def autoDetectCode(self) -> str | None:
 		return "auto"
 
 	@property
-	def default_target_language(self) -> str:
+	def defaultTargetLanguage(self) -> str:
 		return "ZH"
 
-	def get_config_spec(self) -> list[dict]:
-		spec = super().get_config_spec()
+	def getConfigSpec(self) -> list[dict]:
+		spec = super().getConfigSpec()
 		spec.extend(
 			[
 				{"id": "apiKey", "label": _("API Key (Auth Key)"), "type": "password", "default": ""},
@@ -86,14 +86,14 @@ class DeepLEngine(BaseHttpEngine):
 		)
 		return spec
 
-	def get_ui_states(self, all_configs: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-		states = super().get_ui_states(all_configs)
-		target_lang = all_configs.get("langTo", "")
-		is_formality_supported = target_lang.upper() in self.FORMALITY_SUPPORTED_LANGUAGES
-		states["formality"] = {"enabled": is_formality_supported}
+	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, dict[str, Any]]:
+		states = super().getUiStates(allConfigs)
+		targetLang = allConfigs.get("langTo", "")
+		isFormalitySupported = targetLang.upper() in self.FORMALITY_SUPPORTED_LANGUAGES
+		states["formality"] = {"enabled": isFormalitySupported}
 		return states
 
-	def get_supported_languages(self) -> dict:
+	def getSupportedLanguages(self) -> dict:
 		return {
 			"auto": "Auto-detect",
 			"BG": "Bulgarian",
@@ -127,66 +127,66 @@ class DeepLEngine(BaseHttpEngine):
 			"ZH": "Chinese",
 		}
 
-	def _build_request_params(self, text: str, lang_from: str, lang_to: str, config: dict) -> dict:
-		api_key = config.get("apiKey", "").strip()
-		if not api_key:
+	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
+		apiKey = config.get("apiKey", "").strip()
+		if not apiKey:
 			raise AuthenticationError(_("DeepL API Key (Auth Key) is not configured."))
-		use_free_api = config.get("useFreeApi", True)
-		if not use_free_api and api_key.endswith(":fx"):
+		useFreeApi = config.get("useFreeApi", True)
+		if not useFreeApi and apiKey.endswith(":fx"):
 			raise AuthenticationError(
 				_(
 					"You have selected the Pro API, but the provided key is for the Free API. Please check 'Use Free API' in settings."
 				)
 			)
 
-		base_url = self.BASE_URL_FREE if use_free_api else self.BASE_URL_PRO
+		baseUrl = self.BASE_URL_FREE if useFreeApi else self.BASE_URL_PRO
 		headers = {
-			"Authorization": f"DeepL-Auth-Key {api_key}",
+			"Authorization": f"DeepL-Auth-Key {apiKey}",
 			"Content-Type": "application/json",
 			"User-Agent": "NVDA-ModernTranslate-Plugin/1.0",
 		}
 		lines = [line for line in text.splitlines() if line.strip()] or [text]
-		payload = {"text": lines, "target_lang": lang_to.upper()}
+		payload = {"text": lines, "target_lang": langTo.upper()}
 
-		if lang_from != "auto":
-			payload["source_lang"] = lang_from.upper()
+		if langFrom != "auto":
+			payload["source_lang"] = langFrom.upper()
 		if config.get("context", "").strip():
 			payload["context"] = config["context"]
 
-		split_map = {"on": "1", "off": "0", "nonewlines": "nonewlines"}
-		payload["split_sentences"] = split_map.get(config.get("splitSentences", "nonewlines"))
+		splitMap = {"on": "1", "off": "0", "nonewlines": "nonewlines"}
+		payload["split_sentences"] = splitMap.get(config.get("splitSentences", "nonewlines"))
 
 		if config.get("preserveFormatting"):
 			payload["preserve_formatting"] = True
 
 		formality = config.get("formality")
 		if formality and formality != "default":
-			if lang_to.upper() in self.FORMALITY_SUPPORTED_LANGUAGES:
+			if langTo.upper() in self.FORMALITY_SUPPORTED_LANGUAGES:
 				payload["formality"] = formality
 			else:
-				log.warning(f"DeepL: Formality '{formality}' not supported for target '{lang_to}'. Ignoring.")
+				log.warning(f"DeepL: Formality '{formality}' not supported for target '{langTo}'. Ignoring.")
 
-		model_type = config.get("modelType")
-		if model_type and model_type != "latency_optimized":
-			payload["model_type"] = model_type
+		modelType = config.get("modelType")
+		if modelType and modelType != "latency_optimized":
+			payload["model_type"] = modelType
 
 		return {
 			"method": "POST",
-			"url": base_url,
+			"url": baseUrl,
 			"headers": headers,
 			"data": json.dumps(payload).encode("utf-8"),
 		}
 
-	def _parse_response(self, response_body: str) -> dict:
-		data = json.loads(response_body)
+	def _parseResponse(self, responseBody: str) -> dict:
+		data = json.loads(responseBody)
 		if "message" in data:
 			raise DeepLApiError(data["message"])
 		if not data.get("translations"):
 			raise ApiResponseError(_("Invalid API response or no translation result included."))
 
-		translated_text = "\n".join(item.get("text", "") for item in data["translations"])
-		detected_lang = (
+		translatedText = "\n".join(item.get("text", "") for item in data["translations"])
+		detectedLang = (
 			data["translations"][0].get("detected_source_language") if data["translations"] else None
 		)
 
-		return {"translation": translated_text, "lang_detected": detected_lang}
+		return {"translation": translatedText, "langDetected": detectedLang}

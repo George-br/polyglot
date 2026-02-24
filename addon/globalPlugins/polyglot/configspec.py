@@ -2,7 +2,7 @@
 
 from configobj import ConfigObj
 
-config_spec: ConfigObj = ConfigObj(
+configSpec: ConfigObj = ConfigObj(
 	[
 		# Global settings
 		'engine = string(default="google")',
@@ -13,7 +13,7 @@ config_spec: ConfigObj = ConfigObj(
 		"   # [[__many__]] is a wildcard section for engine-specific settings.",
 		"   [[__many__]]",
 		"       # Settings for each engine are dynamically added here.",
-		"       # They are defined by the get_config_spec() method in each engine class.",
+		"       # They are defined by the getConfigSpec() method in each engine class.",
 	],
 	list_values=False,
 	encoding="UTF8",
