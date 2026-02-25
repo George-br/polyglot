@@ -65,11 +65,15 @@ class TranslationSettingsPanel(SettingsPanel):
 		self.copyResultCheckbox = commonSHelper.addItem(
 			wx.CheckBox(self, label=_("Copy manual translation results to clipboard"))
 		)
+		self.enableSmartFilterCheckbox = commonSHelper.addItem(
+			wx.CheckBox(self, label=_("Enable smart speech filter (skips non-translatable text like roles, states, location and other formatting information)"))
+		)
 		self.clearCacheButton = commonSHelper.addItem(wx.Button(self, label=_("Clear Cache")))
 		_unused = sHelper.addItem(commonSizer, flag=wx.EXPAND)
 
 		self.engineChoice.Bind(wx.EVT_CHOICE, self.onEngineChanged)
 		self.copyResultCheckbox.Bind(wx.EVT_CHECKBOX, self.onAnyControlChanged)
+		self.enableSmartFilterCheckbox.Bind(wx.EVT_CHECKBOX, self.onAnyControlChanged)
 		self.clearCacheButton.Bind(wx.EVT_BUTTON, self.onClearCache)
 
 		self._populateInitialState()
@@ -86,6 +90,7 @@ class TranslationSettingsPanel(SettingsPanel):
 
 		conf["engine"] = self.uiModel["engine"]
 		conf["copyResult"] = self.uiModel["copyResult"]
+		conf["enableSmartFilter"] = self.uiModel["enableSmartFilter"]
 
 		for engineId, controls in self.dynamicControls.items():
 			if not controls:
@@ -140,6 +145,7 @@ class TranslationSettingsPanel(SettingsPanel):
 				self.engineChoice.SetStringSelection(self.engines[engineId].name)
 
 			self.copyResultCheckbox.SetValue(conf.get("copyResult", True))
+			self.enableSmartFilterCheckbox.SetValue(conf.get("enableSmartFilter", True))
 
 			self._switchEnginePanel()
 		finally:
@@ -241,6 +247,7 @@ class TranslationSettingsPanel(SettingsPanel):
 		self.uiModel = {
 			"engine": engineId,
 			"copyResult": self.copyResultCheckbox.IsChecked(),
+			"enableSmartFilter": self.enableSmartFilterCheckbox.IsChecked(),
 		}
 
 		if engineId in self.dynamicControls:

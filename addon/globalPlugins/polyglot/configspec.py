@@ -7,6 +7,7 @@ configSpec: ConfigObj = ConfigObj(
 		# Global settings
 		'engine = string(default="google")',
 		"copyResult = boolean(default=False)",
+		"enableSmartFilter = boolean(default=True)",
 		"",
 		# Define an 'engines' subsection for engine-specific configurations.
 		"[engines]",
