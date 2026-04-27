@@ -8,6 +8,7 @@ Download feedback uses periodic beep cues (not speech) to avoid
 triggering the auto-translate cascade loop.
 """
 
+import json
 import threading
 from typing import Any
 from collections.abc import Callable
@@ -29,6 +30,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 	name = _("Chrome AI (Offline)")
 	_downloadLock = threading.Lock()
 	_isDownloading = False
+	_DETECTION_CONFIDENCE_THRESHOLD = 0.35
 
 	def __init__(self) -> None:
 		super().__init__()
@@ -177,6 +179,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		return super().translate(text, langFrom, langTo, config, isCancelled)
 
 	def _makeDownloadHandler(self, modelLabel: str) -> Callable[[str], None]:
+		"""Builds a console log handler for Chrome model download progress events."""
 		def handler(logText: str) -> None:
 			if "[DOWNLOAD_PROGRESS]" in logText:
 				try:
@@ -206,26 +209,33 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 				)
 		return handler
 
+	def _toJsStringLiteral(self, value: str) -> str:
+		"""Converts text to a JavaScript string literal."""
+		return json.dumps(value, ensure_ascii=False)
+
 	def _detectLanguage(self, text: str) -> dict[str, str | None]:
 		"""Detect the source language via a separate CDP call.
 
 		Runs in its own evaluateSync with a fresh userGesture activation,
 		so its model download won't consume the activation needed by the Translator.
 		"""
-		safeText = text.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+		inputText = self._toJsStringLiteral(text)
+		confidenceThreshold = self._DETECTION_CONFIDENCE_THRESHOLD
 		jsPayload = f"""
 		(async () => {{
 			if (typeof LanguageDetector === 'undefined') {{
 				return JSON.stringify({{code: 'DETECTOR_ERR_UNDEFINED'}});
 			}}
+			const inputText = {inputText};
+			const downloadStates = new Set(['downloadable', 'downloading']);
 			try {{
 				if (!globalThis._aiLanguageDetector) {{
 					const detAvail = await LanguageDetector.availability();
 					if (detAvail === 'no' || detAvail === 'unavailable') {{
-						return JSON.stringify({{code: 'DETECTOR_ERR_UNAVAILABLE'}});
+						return JSON.stringify({{code: 'DETECTOR_ERR_UNAVAILABLE', state: detAvail}});
 					}}
 					const detOptions = {{}};
-					if (detAvail === 'downloadable') {{
+					if (downloadStates.has(detAvail)) {{
 						console.log('[DOWNLOAD_START]');
 						detOptions.monitor = (m) => {{
 							m.addEventListener('downloadprogress', (e) => {{
@@ -234,15 +244,22 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 						}};
 					}}
 					globalThis._aiLanguageDetector = await LanguageDetector.create(detOptions);
-					if (detAvail === 'downloadable') {{
+					if (downloadStates.has(detAvail)) {{
 						console.log('[DOWNLOAD_END]');
 					}}
 				}}
-				const detections = await globalThis._aiLanguageDetector.detect(`{safeText}`);
-				if (detections.length > 0 && detections[0].confidence > 0.1) {{
-					return JSON.stringify({{code: 'SUCCESS', lang: detections[0].detectedLanguage}});
+				const detections = await globalThis._aiLanguageDetector.detect(inputText);
+				if (detections.length > 0 && detections[0].confidence >= {confidenceThreshold}) {{
+					return JSON.stringify({{
+						code: 'SUCCESS',
+						lang: detections[0].detectedLanguage,
+						confidence: detections[0].confidence,
+					}});
 				}}
-				return JSON.stringify({{code: 'SUCCESS', lang: 'en'}});
+				return JSON.stringify({{
+					code: 'DETECTOR_ERR_LOW_CONFIDENCE',
+					confidence: detections.length > 0 ? detections[0].confidence : 0,
+				}});
 			}} catch (e) {{
 				return JSON.stringify({{code: 'DETECTOR_ERR_EXCEPTION', message: e.toString()}});
 			}}
@@ -261,8 +278,10 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 					ChromeAiEngine._isDownloading = False
 		code = result.get("code")
 		if code == "SUCCESS":
-			return {"sourceLang": result.get("lang", "en")}
+			sourceLang = result.get("lang") or "en"
+			return {"sourceLang": str(sourceLang)}
 		self._parseCdpResult(result, "")
+		raise EngineError(_("Unexpected response from Chrome AI."))
 
 	def _translateChunk(
 		self, text: str, langFrom: str, langTo: str, config: dict[str, Any]
@@ -272,15 +291,18 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			detectResult = self._detectLanguage(text)
 			langFrom = detectResult["sourceLang"]
 			detectedLang = langFrom
-		safeText = text.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+		inputText = self._toJsStringLiteral(text)
+		sourceLang = self._toJsStringLiteral(langFrom)
+		targetLang = self._toJsStringLiteral(langTo)
 		jsPayload = f"""
 		(async () => {{
 			if (typeof Translator === 'undefined') {{
 				return JSON.stringify({{code: 'API_ERR_UNDEFINED'}});
 			}}
-			const inputText = `{safeText}`;
-			const sourceLang = '{langFrom}';
-			const targetLang = '{langTo}';
+			const inputText = {inputText};
+			const sourceLang = {sourceLang};
+			const targetLang = {targetLang};
+			const downloadStates = new Set(['downloadable', 'downloading']);
 			if (sourceLang === targetLang) {{
 				return JSON.stringify({{code: 'SAME_LANGUAGE'}});
 			}}
@@ -291,9 +313,9 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 					const options = {{ sourceLanguage: sourceLang, targetLanguage: targetLang }};
 					const avail = await Translator.availability(options);
 					if (avail === 'no' || avail === 'unavailable') {{
-						return JSON.stringify({{code: 'MODEL_STATE_NO', pair: key}});
+						return JSON.stringify({{code: 'MODEL_STATE_NO', pair: key, state: avail}});
 					}}
-					if (avail === 'downloadable') {{
+					if (downloadStates.has(avail)) {{
 						console.log('[DOWNLOAD_START]');
 						options.monitor = (m) => {{
 							m.addEventListener('downloadprogress', (e) => {{
@@ -302,7 +324,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 						}};
 					}}
 					globalThis._aiTranslators[key] = await Translator.create(options);
-					if (avail === 'downloadable') {{
+					if (downloadStates.has(avail)) {{
 						console.log('[DOWNLOAD_END]');
 					}}
 				}}
@@ -369,6 +391,13 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		elif code == "DETECTOR_ERR_UNAVAILABLE":
 			raise EngineError(
 				_("Language detection is not supported in this Chrome installation.")
+			)
+		elif code == "DETECTOR_ERR_LOW_CONFIDENCE":
+			confidence = result.get("confidence", 0)
+			raise EngineError(
+				_("Could not confidently detect the source language. "
+				  "Please select a source language instead of Auto-detect. "
+				  "(confidence: {confidence})").format(confidence=confidence)
 			)
 		elif code == "DETECTOR_ERR_EXCEPTION":
 			raise EngineError(_("Language detection error: ") + result.get('message', ''))
