@@ -18,7 +18,7 @@ import queueHandler
 from logHandler import log
 
 from ...common.exceptions import EngineError
-from ...common import cues
+from ...common import cues, languages
 from ..engine import ChunkedTranslationMixin
 from ..cdpBridge import CdpBridge, CdpError
 
@@ -35,48 +35,49 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 	def __init__(self) -> None:
 		super().__init__()
 		self._bridge = CdpBridge.getInstance()
-		self._supportedLangs = {
-			"auto": _("Auto-detect"),
-			"ar": _("Arabic"),
-			"bg": _("Bulgarian"),
-			"bn": _("Bengali"),
-			"cs": _("Czech"),
-			"da": _("Danish"),
-			"de": _("German"),
-			"el": _("Greek"),
-			"en": _("English"),
-			"es": _("Spanish"),
-			"fi": _("Finnish"),
-			"fr": _("French"),
-			"hi": _("Hindi"),
-			"hr": _("Croatian"),
-			"hu": _("Hungarian"),
-			"id": _("Indonesian"),
-			"it": _("Italian"),
-			"iw": _("Hebrew"),
-			"ja": _("Japanese"),
-			"kn": _("Kannada"),
-			"ko": _("Korean"),
-			"lt": _("Lithuanian"),
-			"mr": _("Marathi"),
-			"nl": _("Dutch"),
-			"no": _("Norwegian"),
-			"pl": _("Polish"),
-			"pt": _("Portuguese"),
-			"ro": _("Romanian"),
-			"ru": _("Russian"),
-			"sk": _("Slovak"),
-			"sl": _("Slovenian"),
-			"sv": _("Swedish"),
-			"ta": _("Tamil"),
-			"te": _("Telugu"),
-			"th": _("Thai"),
-			"tr": _("Turkish"),
-			"uk": _("Ukrainian"),
-			"vi": _("Vietnamese"),
-			"zh": _("Chinese"),
-			"zh-Hant": _("Chinese (Traditional)"),
-		}
+		supportedCodes = [
+			"auto",
+			"ar",
+			"bg",
+			"bn",
+			"cs",
+			"da",
+			"de",
+			"el",
+			"en",
+			"es",
+			"fi",
+			"fr",
+			"hi",
+			"hr",
+			"hu",
+			"id",
+			"it",
+			"iw",
+			"ja",
+			"kn",
+			"ko",
+			"lt",
+			"mr",
+			"nl",
+			"no",
+			"pl",
+			"pt",
+			"ro",
+			"ru",
+			"sk",
+			"sl",
+			"sv",
+			"ta",
+			"te",
+			"th",
+			"tr",
+			"uk",
+			"vi",
+			"zh",
+			"zh-Hant",
+		]
+		self._supportedLangs = languages.getLanguageDictForCodes(supportedCodes)
 
 	@property
 	def autoDetectCode(self) -> str | None:
