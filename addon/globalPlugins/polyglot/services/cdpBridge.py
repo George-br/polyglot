@@ -25,7 +25,15 @@ from logHandler import log
 import websocket
 
 
-USER_DATA_DIR = os.path.join(globalVars.appArgs.configPath, "polyglot_chrome_ai")
+def _getUserDataDir() -> str:
+	"""Returns the local Chrome profile directory used by Chrome AI."""
+	localAppData = os.environ.get("LOCALAPPDATA")
+	if localAppData:
+		return os.path.join(localAppData, "Polyglot", "ChromeAI")
+	return os.path.join(globalVars.appArgs.configPath, "polyglot_chrome_ai")
+
+
+USER_DATA_DIR = _getUserDataDir()
 DEVTOOLS_ACTIVE_PORT_FILE = os.path.join(USER_DATA_DIR, "DevToolsActivePort")
 PAGE_FILE = os.path.join(USER_DATA_DIR, "chrome_ai.html")
 
