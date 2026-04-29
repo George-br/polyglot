@@ -21,7 +21,9 @@ R = TypeVar("R")
 
 
 def retryOnNetworkError(
-	attempts: int = 3, delay: float = 0.5, backoff: float = 1.5
+	attempts: int = 3,
+	delay: float = 0.5,
+	backoff: float = 1.5,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
 	"""
 	A decorator that provides intelligent retry logic for `requests` calls.
@@ -69,17 +71,17 @@ def retryOnNetworkError(
 			if isinstance(lastException, requests.exceptions.HTTPError):
 				raise ApiResponseError(
 					_(
-						"Service temporarily unavailable or timed out. Please try again later. (HTTP {code})"
-					).format(code=lastException.response.status_code)
+						"Service temporarily unavailable or timed out. Please try again later. (HTTP {code})",
+					).format(code=lastException.response.status_code),
 				) from lastException
 			elif isinstance(lastException, requests.exceptions.Timeout):
 				raise NetworkConnectionError(
-					_("Request to translation service timed out")
+					_("Request to translation service timed out"),
 				) from lastException
 			else:
 				# Translators: Error message for generic network connection failures. {error} is the detailed error description.
 				raise NetworkConnectionError(
-					_("Network connection error: {error}").format(error=lastException)
+					_("Network connection error: {error}").format(error=lastException),
 				) from lastException
 
 		return wrapper
@@ -120,7 +122,8 @@ def sendRequest(
 	except requests.exceptions.HTTPError as e:
 		# This try-except block now only handles HTTP errors that the decorator has decided not to retry.
 		log.error(
-			f"Non-retryable HTTP error occurred: {e.response.status_code} {e.response.reason}", exc_info=True
+			f"Non-retryable HTTP error occurred: {e.response.status_code} {e.response.reason}",
+			exc_info=True,
 		)
 		statusCode = e.response.status_code
 		if statusCode == 403:
@@ -132,6 +135,8 @@ def sendRequest(
 		# Translators: Error message for HTTP failures. {code} is the HTTP status code, {reason} is the status message, and {details} is the error body.
 		raise ApiResponseError(
 			_("Service returned an error: {code} {reason}. Details: {details}").format(
-				code=statusCode, reason=e.response.reason, details=errorDetails
-			)
+				code=statusCode,
+				reason=e.response.reason,
+				details=errorDetails,
+			),
 		) from e

@@ -47,7 +47,7 @@ class TencentWebTranslateEngine(BaseHttpEngine):
 			[
 				{"id": "nvdacnUser", "label": _("NVDACN Username"), "type": "text", "default": ""},
 				{"id": "nvdacnPass", "label": _("NVDACN Password"), "type": "password", "default": ""},
-			]
+			],
 		)
 		return spec
 
@@ -61,7 +61,7 @@ class TencentWebTranslateEngine(BaseHttpEngine):
 			"user": nvdacnUser,
 			"pass": nvdacnPass,
 			"name": "tencentWeb",
-			"action": "translate"
+			"action": "translate",
 		}
 		url = f"{self.API_URL}?{urllib.parse.urlencode(queryParams)}"
 
@@ -72,7 +72,12 @@ class TencentWebTranslateEngine(BaseHttpEngine):
 			"target": langTo,
 		}
 		headers = {"Content-Type": "application/json"}
-		return {"method": "POST", "url": url, "headers": headers, "data": json.dumps(bodyParams).encode("utf-8")}
+		return {
+			"method": "POST",
+			"url": url,
+			"headers": headers,
+			"data": json.dumps(bodyParams).encode("utf-8"),
+		}
 
 	def _parseResponse(self, responseBody: str) -> dict:
 		result = json.loads(responseBody)
@@ -83,7 +88,9 @@ class TencentWebTranslateEngine(BaseHttpEngine):
 				detectedLang = data.get("langDetected")
 				return {"translation": translatedText, "langDetected": detectedLang}
 			else:
-				raise TencentWebApiError(_("API response successful but did not contain a translation result."))
+				raise TencentWebApiError(
+					_("API response successful but did not contain a translation result."),
+				)
 		else:
 			errorCode = result.get("code")
 			errorMessage = result.get("data", _("Unknown API error"))

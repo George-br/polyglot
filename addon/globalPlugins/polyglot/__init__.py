@@ -5,8 +5,8 @@ import sys
 _ADDON_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _WEBSOCKET_CLIENT_PATH = os.path.join(_ADDON_DIR, "websocketClientRepo")
 if _WEBSOCKET_CLIENT_PATH not in sys.path:
-    # Insert at priority 1 to keep current dir at 0, but override other global packages
-    sys.path.insert(1, _WEBSOCKET_CLIENT_PATH)
+	# Insert at priority 1 to keep current dir at 0, but override other global packages
+	sys.path.insert(1, _WEBSOCKET_CLIENT_PATH)
 
 import addonHandler
 import api
@@ -93,7 +93,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		if not globalVars.appArgs.secure:
 			if settings.TranslationSettingsPanel in gui.settingsDialogs.NVDASettingsDialog.categoryClasses:
 				gui.settingsDialogs.NVDASettingsDialog.categoryClasses.remove(
-					settings.TranslationSettingsPanel
+					settings.TranslationSettingsPanel,
 				)
 		super().terminate()
 
@@ -104,7 +104,7 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		if not script:
 			script = self.script_layerError
 
-		if getattr(script, '_stayInLayer', False):
+		if getattr(script, "_stayInLayer", False):
 			return script
 
 		def wrappedScript(g):
@@ -172,21 +172,25 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@script(description=_("Next source language"))
 	def script_cycleSourceLangForward(self, gesture: "inputCore.InputGesture") -> None:
 		self._cycleLanguage("source", forward=True)
+
 	script_cycleSourceLangForward._stayInLayer = True
 
 	@script(description=_("Previous source language"))
 	def script_cycleSourceLangBackward(self, gesture: "inputCore.InputGesture") -> None:
 		self._cycleLanguage("source", forward=False)
+
 	script_cycleSourceLangBackward._stayInLayer = True
 
 	@script(description=_("Next target language"))
 	def script_cycleTargetLangForward(self, gesture: "inputCore.InputGesture") -> None:
 		self._cycleLanguage("target", forward=True)
+
 	script_cycleTargetLangForward._stayInLayer = True
 
 	@script(description=_("Previous target language"))
 	def script_cycleTargetLangBackward(self, gesture: "inputCore.InputGesture") -> None:
 		self._cycleLanguage("target", forward=False)
+
 	script_cycleTargetLangBackward._stayInLayer = True
 
 	def _cycleEngine(self, forward: bool) -> None:
@@ -198,11 +202,13 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 	@script(description=_("Next translation engine"))
 	def script_cycleEngineForward(self, gesture: "inputCore.InputGesture") -> None:
 		self._cycleEngine(forward=True)
+
 	script_cycleEngineForward._stayInLayer = True
 
 	@script(description=_("Previous translation engine"))
 	def script_cycleEngineBackward(self, gesture: "inputCore.InputGesture") -> None:
 		self._cycleEngine(forward=False)
+
 	script_cycleEngineBackward._stayInLayer = True
 
 	@script(description=_("Swap source and target languages"))
@@ -211,12 +217,14 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		cues.Speech.message(message)
 		if not success:
 			tones.beep(220, 120)
+
 	script_swapLanguages._stayInLayer = True
 
 	@script(description=_("Announce current engine and languages"))
 	def script_announceEngineLanguagesInfo(self, gesture: "inputCore.InputGesture") -> None:
 		announcement = self.manager.getCurrentEngineAndLanguageInfo()
 		cues.Speech.message(announcement)
+
 	script_announceEngineLanguagesInfo._stayInLayer = True
 
 	@script(description=_("Copy last translation to clipboard"))
@@ -303,27 +311,46 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 			title=_("Polyglot Help"),
 			isHtml=True,
 			closeButton=True,
-			copyButton=True
+			copyButton=True,
 		)
 
 	def _generateLayerHelpHtml(self) -> str:
 		groups = [
-			(_("Translation Actions"), [
-				"translateSelection", "translateReverseSelection",
-				"translateClipboard", "translateReverseClipboard",
-				"translateLastSpoken", "translateReverseLastSpoken"
-			]),
-			(_("Configuration & Switching"), [
-				"cycleSourceLangForward", "cycleSourceLangBackward",
-				"cycleTargetLangForward", "cycleTargetLangBackward",
-				"cycleEngineForward", "cycleEngineBackward",
-				"swapLanguages", "announceEngineLanguagesInfo"
-			]),
-			(_("Tools & System"), [
-				"openInteractiveDialog",
-				"copyLastResult", "toggleAutoTranslate",
-				"clearCache", "openSettings", "layerHelp"
-			])
+			(
+				_("Translation Actions"),
+				[
+					"translateSelection",
+					"translateReverseSelection",
+					"translateClipboard",
+					"translateReverseClipboard",
+					"translateLastSpoken",
+					"translateReverseLastSpoken",
+				],
+			),
+			(
+				_("Configuration & Switching"),
+				[
+					"cycleSourceLangForward",
+					"cycleSourceLangBackward",
+					"cycleTargetLangForward",
+					"cycleTargetLangBackward",
+					"cycleEngineForward",
+					"cycleEngineBackward",
+					"swapLanguages",
+					"announceEngineLanguagesInfo",
+				],
+			),
+			(
+				_("Tools & System"),
+				[
+					"openInteractiveDialog",
+					"copyLastResult",
+					"toggleAutoTranslate",
+					"clearCache",
+					"openSettings",
+					"layerHelp",
+				],
+			),
 		]
 
 		scriptToKey = {}
@@ -335,7 +362,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 		for title, scripts in groups:
 			htmlParts.append(f"<h2>{title}</h2>")
 			htmlParts.append("<table border='1' style='border-collapse: collapse; width: 100%;'>")
-			htmlParts.append(f"<thead><tr><th style='text-align: left; padding: 5px;'>{_('Key')}</th><th style='text-align: left; padding: 5px;'>{_('Action')}</th></tr></thead>")
+			htmlParts.append(
+				f"<thead><tr><th style='text-align: left; padding: 5px;'>{_('Key')}</th><th style='text-align: left; padding: 5px;'>{_('Action')}</th></tr></thead>",
+			)
 			htmlParts.append("<tbody>")
 			for scriptName in scripts:
 				keyDisplay = scriptToKey.get(scriptName, "")
@@ -343,7 +372,9 @@ class GlobalPlugin(globalPluginHandler.GlobalPlugin):
 					continue
 				method = getattr(self, f"script_{scriptName}")
 				description = method.__doc__ or scriptName
-				htmlParts.append(f"<tr><td style='padding: 5px;'>{keyDisplay}</td><td style='padding: 5px;'>{description}</td></tr>")
+				htmlParts.append(
+					f"<tr><td style='padding: 5px;'>{keyDisplay}</td><td style='padding: 5px;'>{description}</td></tr>",
+				)
 			htmlParts.append("</tbody></table>")
 
 		return "".join(htmlParts)

@@ -170,7 +170,7 @@ def getLanguageDictForCodes(codes: list[str]) -> dict[str, str]:
 		else:
 			# Log an error for missing definitions and use the code as a fallback display name.
 			log.error(
-				f"Language code '{code}' not found in central repository. Using the code as its display name."
+				f"Language code '{code}' not found in central repository. Using the code as its display name.",
 			)
 			langDict[code] = code
 	return langDict

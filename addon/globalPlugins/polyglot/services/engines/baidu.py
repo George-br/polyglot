@@ -62,12 +62,12 @@ class BaiduTranslateEngine(BaseHttpEngine):
 				{
 					"id": "useTermbase",
 					"label": _(
-						"Use custom terminology (requires authentication and configuration on the platform)"
+						"Use custom terminology (requires authentication and configuration on the platform)",
 					),
 					"type": "checkbox",
 					"default": False,
 				},
-			]
+			],
 		)
 		return spec
 

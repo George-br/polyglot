@@ -51,8 +51,7 @@ def _hookedGetPropertiesSpeech(reason=speech.speech.OutputReason.QUERY, **kwargs
 	result = _origGetPropertiesSpeech(reason, **kwargs)
 	# Wrap any remaining plain strings (role, state, level, etc.) as untranslatable.
 	return [
-		s if isinstance(s, TranslatableString) else _UntranslatableString(s)
-		if isinstance(s, str) else s
+		s if isinstance(s, TranslatableString) else _UntranslatableString(s) if isinstance(s, str) else s
 		for s in result
 	]
 
@@ -70,9 +69,9 @@ def _hookedGetControlFieldSpeech(attrs=None, *args, **kwargs):
 		attrs = kwargs.get("attrs")
 	elif "attrs" in kwargs:
 		kwargs.pop("attrs")
-	
+
 	result = _origGetControlFieldSpeech(attrs, *args, **kwargs)
-	
+
 	content = attrs.get("content") if hasattr(attrs, "get") else None
 	new_result = []
 	for s in result:
@@ -196,8 +195,11 @@ class SpeechFilter:
 		Returns ``(joinedText, indicesIntoSequence)``.
 		"""
 		pairs = [
-			(i, s) for i, s in enumerate(sequence)
-			if isinstance(s, str) and (not enableSmartFilter or not isinstance(s, _UntranslatableString)) and s.strip()
+			(i, s)
+			for i, s in enumerate(sequence)
+			if isinstance(s, str)
+			and (not enableSmartFilter or not isinstance(s, _UntranslatableString))
+			and s.strip()
 		]
 		indices = [i for i, _ in pairs]
 		text = " ".join(s.strip() for _, s in pairs)
@@ -233,7 +235,9 @@ class SpeechFilter:
 				showStatus=False,
 				allowCopy=False,
 				onSuccess=lambda translation: self._handleAutoTranslationResult(
-					translation, sequence, translatableIndices,
+					translation,
+					sequence,
+					translatableIndices,
 				),
 			)
 		# Block the original speech sequence; it will be replaced by the translation.

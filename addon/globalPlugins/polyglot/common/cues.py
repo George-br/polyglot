@@ -106,8 +106,10 @@ class Sound:
 		    intervalMs: The interval in milliseconds between each playback trigger.
 		    delayMs: The initial delay in milliseconds before the first trigger.
 		"""
+
 		def cueFunction():
 			Sound.play(eventName)
+
 		_startPeriodicCueInternal(cueFunction, intervalMs, delayMs)
 
 
@@ -131,8 +133,10 @@ class Beep:
 	@staticmethod
 	def startPeriodic(eventName: str, intervalMs: int, delayMs: int) -> None:
 		"""Starts a periodic beep cue."""
+
 		def cueFunction():
 			Beep.play(eventName)
+
 		_startPeriodicCueInternal(cueFunction, intervalMs, delayMs)
 
 	_lastBeepPct: int = -100

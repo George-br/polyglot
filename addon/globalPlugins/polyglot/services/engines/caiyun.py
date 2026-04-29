@@ -63,7 +63,7 @@ class CaiyunTranslateEngine(BaseHttpEngine):
 		spec.extend(
 			[
 				{"id": "token", "label": _("Authentication Token"), "type": "password", "default": ""},
-			]
+			],
 		)
 		return spec
 

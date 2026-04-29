@@ -142,7 +142,7 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 					"type": "text",
 					"default": self.PROMPT_FLUENT_USER.replace("\n", "\\n"),
 				},
-			]
+			],
 		)
 		return spec
 
@@ -156,7 +156,11 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 		return states
 
 	def _buildRequestParams(
-		self, text: str, langFrom: str, langTo: str, config: dict[str, Any]
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
 	) -> dict[str, Any]:
 		apiUrl = config.get("apiUrl", "https://openrouter.ai/api/v1/chat/completions").strip()
 		if not apiUrl:
@@ -246,7 +250,7 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 
 					if translatedText is None:
 						log.warning(
-							f"'{self.id}' response was JSON but missing 'translation' key. Falling back."
+							f"'{self.id}' response was JSON but missing 'translation' key. Falling back.",
 						)
 						return {"translation": modelResponseStr.strip(), "langDetected": None}
 
@@ -256,7 +260,7 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 					}
 				except (json.JSONDecodeError, KeyError, TypeError) as e:
 					log.warning(
-						f"Could not parse model's response as JSON for '{self.id}'. Treating as plain text. Error: {e}"
+						f"Could not parse model's response as JSON for '{self.id}'. Treating as plain text. Error: {e}",
 					)
 					return {"translation": modelResponseStr.strip(), "langDetected": None}
 			return {"translation": modelResponseStr.strip(), "langDetected": None}

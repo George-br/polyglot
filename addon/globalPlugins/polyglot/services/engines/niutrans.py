@@ -49,7 +49,7 @@ class NiutransTranslateEngine(BaseHttpEngine):
 		"20001": _("Authentication failed"),
 		"20002": _("Parameters do not conform to specifications"),
 		"20003": _(
-			"Parameter validation exception (e.g., from/to/srcText/appId/authStr/timestamp cannot be empty)"
+			"Parameter validation exception (e.g., from/to/srcText/appId/authStr/timestamp cannot be empty)",
 		),
 		"000000": _("Incorrect request parameters"),
 		"000001": _("Unsupported parameter passing method"),
@@ -106,7 +106,7 @@ class NiutransTranslateEngine(BaseHttpEngine):
 					},
 					"default": "src_first",
 				},
-			]
+			],
 		)
 		return spec
 

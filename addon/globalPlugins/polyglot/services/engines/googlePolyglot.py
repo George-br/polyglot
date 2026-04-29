@@ -142,14 +142,19 @@ class GoogleHQTranslateEngine(BaseHttpEngine):
 		spec = super().getConfigSpec()
 		spec.extend(
 			[
-				{"id": "apiKey", "label": _("API Key"), "type": "password", "default": "3a64ad20-724b-41dc-ba23-cf64185dbfa3"},
+				{
+					"id": "apiKey",
+					"label": _("API Key"),
+					"type": "password",
+					"default": "3a64ad20-724b-41dc-ba23-cf64185dbfa3",
+				},
 				{
 					"id": "customUrl",
 					"label": _("Endpoint URL"),
 					"type": "text",
 					"default": "https://translate.googleapis.mirror.nvdadr.com/polyglotGoogle",
 				},
-			]
+			],
 		)
 		return spec
 

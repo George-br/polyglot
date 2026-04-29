@@ -113,7 +113,7 @@ class OllamaBaseEngine(BaseHttpEngine):
 					"type": "text",
 					"default": "Translate to $to_name: $text",
 				},
-			]
+			],
 		)
 		return spec
 
@@ -211,6 +211,6 @@ class OllamaBaseEngine(BaseHttpEngine):
 
 		except (json.JSONDecodeError, KeyError, TypeError):
 			log.warning(
-				f"Could not parse model's response as JSON. Treating as plain text. Response: {modelResponseStr}"
+				f"Could not parse model's response as JSON. Treating as plain text. Response: {modelResponseStr}",
 			)
 			return {"translation": modelResponseStr.strip(), "langDetected": None}

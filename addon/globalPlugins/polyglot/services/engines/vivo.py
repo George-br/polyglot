@@ -53,7 +53,7 @@ class VivoTranslateEngine(BaseHttpEngine):
 			[
 				{"id": "nvdacnUser", "label": _("NVDACN Username"), "type": "text", "default": ""},
 				{"id": "nvdacnPass", "label": _("NVDACN Password"), "type": "password", "default": ""},
-			]
+			],
 		)
 		return spec
 
@@ -75,8 +75,8 @@ class VivoTranslateEngine(BaseHttpEngine):
 			log.error("Failed to connect to NVDACN authentication server.", exc_info=True)
 			raise EngineError(
 				_(
-					"Could not connect to the NVDACN authentication server to get a signature. Please check your network connection or try again later."
-				)
+					"Could not connect to the NVDACN authentication server to get a signature. Please check your network connection or try again later.",
+				),
 			) from e
 		except AuthenticationError as e:
 			# Translators: Error message when authentication with the translation service fails. {error} is the detailed error description.

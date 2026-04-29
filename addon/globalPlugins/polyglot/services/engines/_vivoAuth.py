@@ -55,7 +55,10 @@ def _fetchSignatureFromService(nvdacnUser: str, nvdacnPass: str, signingStringBy
 
 	try:
 		responseBody = network.sendRequest(
-			method="POST", url=url, data=signingStringBytes, timeout=AUTH_REQUEST_TIMEOUT
+			method="POST",
+			url=url,
+			data=signingStringBytes,
+			timeout=AUTH_REQUEST_TIMEOUT,
 		)
 
 		result = json.loads(responseBody)
@@ -75,7 +78,9 @@ def _fetchSignatureFromService(nvdacnUser: str, nvdacnPass: str, signingStringBy
 
 	except NetworkConnectionError as e:
 		log.error(
-			"A network error occurred while fetching Vivo signature for user: %s.", nvdacnUser, exc_info=True
+			"A network error occurred while fetching Vivo signature for user: %s.",
+			nvdacnUser,
+			exc_info=True,
 		)
 		raise AuthenticationError(_("Could not connect to the authentication server.")) from e
 	except (json.JSONDecodeError, KeyError, TypeError) as e:

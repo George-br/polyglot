@@ -163,7 +163,12 @@ class MicrosoftTranslateEngine(BaseHttpEngine):
 			raise EngineError(_("An unknown error occurred during translation.")) from e
 
 	def _buildRequestParams(
-		self, text: str, langFrom: str, langTo: str, config: dict, authToken: str
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict,
+		authToken: str,
 	) -> dict:
 		"""
 		Builds the request dictionary for the actual translation API call.

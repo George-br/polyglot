@@ -45,8 +45,8 @@ class GoogleTranslateEngine(BaseHttpEngine):
 					"label": _("Use mirror server (translate.googleapis.mirror.nvdadr.com)"),
 					"type": "checkbox",
 					"default": False,
-				}
-			]
+				},
+			],
 		)
 		return spec
 

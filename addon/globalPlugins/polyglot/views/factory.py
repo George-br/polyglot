@@ -25,7 +25,9 @@ class ControlHandlerBase(ABC):
 
 	@abstractmethod
 	def createControlPair(
-		self, panel: wx.Window, spec: ConfigSpec
+		self,
+		panel: wx.Window,
+		spec: ConfigSpec,
 	) -> tuple[wx.StaticText | None, wx.Control]:
 		pass
 
@@ -43,7 +45,11 @@ class ControlHandlerBase(ABC):
 		pass
 
 	def updateControlState(
-		self, control: wx.Control, labelControl: wx.StaticText | None, prop: str, value: Any
+		self,
+		control: wx.Control,
+		labelControl: wx.StaticText | None,
+		prop: str,
+		value: Any,
 	):
 		if prop == "enabled":
 			if control.IsEnabled() != value:
@@ -73,6 +79,7 @@ _controlRegistry: dict[str, ControlHandlerBase] = {}
 
 def registerControl(typeName: str) -> Callable[[type[ControlHandlerBase]], type[ControlHandlerBase]]:
 	"""Class decorator that registers a control handler for the given config type name."""
+
 	def decorator(cls: type[ControlHandlerBase]) -> type[ControlHandlerBase]:
 		if typeName in _controlRegistry:
 			raise ValueError(f"Control type '{typeName}' is already registered.")
@@ -99,7 +106,9 @@ class CheckboxHandler(ControlHandlerBase):
 		return str(bool(value)).capitalize()
 
 	def createControlPair(
-		self, panel: wx.Window, spec: ConfigSpec
+		self,
+		panel: wx.Window,
+		spec: ConfigSpec,
 	) -> tuple[wx.StaticText | None, wx.Control]:
 		control = wx.CheckBox(panel, label=spec["label"])
 		return (None, control)
@@ -128,7 +137,9 @@ class CheckboxHandler(ControlHandlerBase):
 
 class LabeledControlHandler(ControlHandlerBase, ABC):
 	def createControlPair(
-		self, panel: wx.Window, spec: ConfigSpec
+		self,
+		panel: wx.Window,
+		spec: ConfigSpec,
 	) -> tuple[wx.StaticText | None, wx.Control]:
 		wxClass, kwargs = self.getWxClassAndKwargs(spec)
 		label = wx.StaticText(panel, label=spec["label"])
@@ -198,7 +209,11 @@ class ChoiceHandler(LabeledControlHandler):
 		self.populateChoices(control, spec.get("choices", {}), value)
 
 	def updateControlState(
-		self, control: wx.Control, labelControl: wx.StaticText | None, prop: str, value: Any
+		self,
+		control: wx.Control,
+		labelControl: wx.StaticText | None,
+		prop: str,
+		value: Any,
 	) -> None:
 		assert isinstance(control, wx.Choice)
 		if prop == "choices":
@@ -208,7 +223,10 @@ class ChoiceHandler(LabeledControlHandler):
 			super().updateControlState(control, labelControl, prop, value)
 
 	def populateChoices(
-		self, choiceCtrl: wx.Choice, choicesDict: dict[str, str], currentValueCode: Any = None
+		self,
+		choiceCtrl: wx.Choice,
+		choicesDict: dict[str, str],
+		currentValueCode: Any = None,
 	) -> None:
 		currentChoices = OrderedDict()
 		for i in range(choiceCtrl.GetCount()):

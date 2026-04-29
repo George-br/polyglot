@@ -63,10 +63,15 @@ class TranslationSettingsPanel(SettingsPanel):
 		commonSHelper = guiHelper.BoxSizerHelper(self, sizer=commonSizer)
 
 		self.copyResultCheckbox = commonSHelper.addItem(
-			wx.CheckBox(self, label=_("Copy manual translation results to clipboard"))
+			wx.CheckBox(self, label=_("Copy manual translation results to clipboard")),
 		)
 		self.enableSmartFilterCheckbox = commonSHelper.addItem(
-			wx.CheckBox(self, label=_("Enable smart speech filter (skips non-translatable text like roles, states, location and other formatting information)"))
+			wx.CheckBox(
+				self,
+				label=_(
+					"Enable smart speech filter (skips non-translatable text like roles, states, location and other formatting information)",
+				),
+			),
 		)
 		self.clearCacheButton = commonSHelper.addItem(wx.Button(self, label=_("Clear Cache")))
 		_unused = sHelper.addItem(commonSizer, flag=wx.EXPAND)
@@ -190,7 +195,8 @@ class TranslationSettingsPanel(SettingsPanel):
 
 		if not configSpecList:
 			noSettingsText = wx.StaticText(
-				panel, label=_("This engine requires no additional configuration.")
+				panel,
+				label=_("This engine requires no additional configuration."),
 			)
 			containerSizer.Add(noSettingsText, 0, wx.ALL, 5)
 			panel.SetSizer(containerSizer)

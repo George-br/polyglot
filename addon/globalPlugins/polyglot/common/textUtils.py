@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+
 def splitText(text: str, maxLength: int) -> list[str]:
 	"""
 	Splits text into chunks of at most maxLength characters using a recursive approach.
@@ -12,12 +13,12 @@ def splitText(text: str, maxLength: int) -> list[str]:
 		if len(currentText) <= maxLength:
 			return [currentText]
 		if not separators:
-			return [currentText[i:i+maxLength] for i in range(0, len(currentText), maxLength)]
-		
+			return [currentText[i : i + maxLength] for i in range(0, len(currentText), maxLength)]
+
 		sep = separators[0]
-		if sep == '':
-			return [currentText[i:i+maxLength] for i in range(0, len(currentText), maxLength)]
-			
+		if sep == "":
+			return [currentText[i : i + maxLength] for i in range(0, len(currentText), maxLength)]
+
 		chunks = currentText.split(sep)
 		newChunks = []
 		for i, chunk in enumerate(chunks):
@@ -26,10 +27,10 @@ def splitText(text: str, maxLength: int) -> list[str]:
 			else:
 				if chunk:
 					newChunks.append(chunk)
-					
+
 		result = []
 		currentChunk = ""
-		
+
 		for c in newChunks:
 			if len(c) > maxLength:
 				if currentChunk:
@@ -45,10 +46,10 @@ def splitText(text: str, maxLength: int) -> list[str]:
 					if currentChunk:
 						result.append(currentChunk)
 					currentChunk = c
-					
+
 		if currentChunk:
 			result.append(currentChunk)
-			
+
 		return result
 
-	return _split(text, ['\n\n', '\n', '. ', '。', ' ', ''])
+	return _split(text, ["\n\n", "\n", ". ", "。", " ", ""])

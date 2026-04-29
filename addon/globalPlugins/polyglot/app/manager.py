@@ -73,11 +73,12 @@ class TranslationManager:
 		engineConf["langFrom"] = currentTo
 		engineConf["langTo"] = currentFrom
 		log.info(
-			f"Languages swapped for engine '{engineId}'. New config: From={currentTo}, To={currentFrom}"
+			f"Languages swapped for engine '{engineId}'. New config: From={currentTo}, To={currentFrom}",
 		)
 		# Translators: A message indicating that the source and target languages have been swapped. {source} is the new source language, {target} is the new target language.
 		message = _("Languages swapped: from {source} to {target}").format(
-			source=currentTo, target=currentFrom
+			source=currentTo,
+			target=currentFrom,
 		)
 		return (True, message)
 
@@ -173,11 +174,13 @@ class TranslationManager:
 			langToDesc = languages.ALL_LANGUAGES.get(langToCode, langToCode)
 			# Translators: Announcement of the current translation engine and languages. {engine} is the engine name, {source} is the source language, {target} is the target language.
 			return _("{engine}, from {source} to {target}").format(
-				engine=currentEngine.name, source=langFromDesc, target=langToDesc
+				engine=currentEngine.name,
+				source=langFromDesc,
+				target=langToDesc,
 			)
 		except (ValueError, NotImplementedError):
 			log.warning(
-				f"Could not get language announcement. Engine '{engineId}' may be invalid or not fully implemented."
+				f"Could not get language announcement. Engine '{engineId}' may be invalid or not fully implemented.",
 			)
 			return _("Languages not configured or current engine is invalid")
 
@@ -256,14 +259,15 @@ class TranslationManager:
 			currentEngine = engineManager.getEngineById(engineId)
 		except (ValueError, NotImplementedError):
 			log.error(
-				f"Selected engine '{engineId}' is not available or not fully implemented.", exc_info=True
+				f"Selected engine '{engineId}' is not available or not fully implemented.",
+				exc_info=True,
 			)
 			if isManual:
 				# Translators: Error message when the selected translation engine is not available or not configured. {engine} is the internal ID of the engine.
 				cues.Speech.message(
 					_("Error: Selected engine '{engine}' is unavailable or not configured.").format(
-						engine=engineId
-					)
+						engine=engineId,
+					),
 				)
 			return
 		if engineId not in conf["engines"]:
@@ -276,7 +280,8 @@ class TranslationManager:
 				langTo = engineConfig.get("langTo", currentEngine.defaultTargetLanguage)
 		except NotImplementedError:
 			log.error(
-				f"Engine '{engineId}' is missing required default language implementations.", exc_info=True
+				f"Engine '{engineId}' is missing required default language implementations.",
+				exc_info=True,
 			)
 			if isManual:
 				# Translators: Error message when the selected translation engine is not configured properly. {engine} is the internal ID of the engine.
@@ -309,7 +314,11 @@ class TranslationManager:
 
 		def callback(result: dict[str, Any]) -> None:
 			self._onTranslationComplete(
-				result, isManual=isManual, allowCopy=allowCopy, onSuccess=onSuccess, onError=onError
+				result,
+				isManual=isManual,
+				allowCopy=allowCopy,
+				onSuccess=onSuccess,
+				onError=onError,
 			)
 
 		task = TranslationTask(
@@ -326,8 +335,12 @@ class TranslationManager:
 		task.start()
 
 	def _onTranslationComplete(
-		self, result: dict[str, Any], isManual: bool, allowCopy: bool,
-		onSuccess: OnSuccessCallback, onError: OnErrorCallback = None,
+		self,
+		result: dict[str, Any],
+		isManual: bool,
+		allowCopy: bool,
+		onSuccess: OnSuccessCallback,
+		onError: OnErrorCallback = None,
 	) -> None:
 		cues.stopPeriodicCue()
 

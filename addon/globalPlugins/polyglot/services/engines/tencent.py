@@ -80,7 +80,7 @@ class TencentTranslateEngine(BaseHttpEngine):
 					},
 					"default": "ap-beijing",
 				},
-			]
+			],
 		)
 		return spec
 
@@ -129,7 +129,9 @@ class TencentTranslateEngine(BaseHttpEngine):
 		secretService = sha256Hmac(service.encode("utf-8"), secretDate)
 		secretSigning = sha256Hmac(b"tc3_request", secretService)
 		signature = hmac.new(
-			secretSigning, stringToSign.encode("utf-8"), digestmod=hashlib.sha256
+			secretSigning,
+			stringToSign.encode("utf-8"),
+			digestmod=hashlib.sha256,
 		).hexdigest()
 
 		authorization = (
@@ -166,7 +168,7 @@ class TencentTranslateEngine(BaseHttpEngine):
 
 			if "AuthFailure" in errorCode:
 				raise AuthenticationError(
-					f"{_('Authentication failed')}: {errorMessage} (Code: {errorCode})"
+					f"{_('Authentication failed')}: {errorMessage} (Code: {errorCode})",
 				)
 			else:
 				raise TencentApiError(f"{errorMessage} (Code: {errorCode})")

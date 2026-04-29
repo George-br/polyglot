@@ -33,7 +33,7 @@ def _scanAndLoadEngines() -> None:
 			log.error(f"Failed to load engine module '{name}'", exc_info=True)
 	if not _engineInstances:
 		log.warning(
-			"""No translation engines were loaded successfully. This may be due to errors in the engine modules or an issue with the add-on installation. Translation functionality will not be available."""
+			"""No translation engines were loaded successfully. This may be due to errors in the engine modules or an issue with the add-on installation. Translation functionality will not be available.""",
 		)
 	assert _engineInstances is not None
 	_engineInstances.sort(key=lambda e: e.name)

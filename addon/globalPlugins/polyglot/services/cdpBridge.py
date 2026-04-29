@@ -122,7 +122,7 @@ class CdpBridge:
 
 	def _preparePageUrl(self) -> str:
 		"""Creates a local secure-context page and returns its file URL."""
-		html = "<!doctype html><meta charset=\"utf-8\"><title>Polyglot Chrome AI</title>"
+		html = '<!doctype html><meta charset="utf-8"><title>Polyglot Chrome AI</title>'
 		with open(PAGE_FILE, "w", encoding="utf-8") as pageFile:
 			pageFile.write(html)
 		return Path(PAGE_FILE).resolve().as_uri()

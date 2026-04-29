@@ -82,7 +82,7 @@ class DeepLEngine(BaseHttpEngine):
 					},
 					"default": "latency_optimized",
 				},
-			]
+			],
 		)
 		return spec
 
@@ -135,8 +135,8 @@ class DeepLEngine(BaseHttpEngine):
 		if not useFreeApi and apiKey.endswith(":fx"):
 			raise AuthenticationError(
 				_(
-					"You have selected the Pro API, but the provided key is for the Free API. Please check 'Use Free API' in settings."
-				)
+					"You have selected the Pro API, but the provided key is for the Free API. Please check 'Use Free API' in settings.",
+				),
 			)
 
 		baseUrl = self.BASE_URL_FREE if useFreeApi else self.BASE_URL_PRO

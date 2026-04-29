@@ -61,7 +61,14 @@ class TranslationEngine(ABC):
 		pass
 
 	@abstractmethod
-	def translate(self, text: str, langFrom: str, langTo: str, config: dict[str, Any], isCancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
+	def translate(
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
+		isCancelled: Callable[[], bool] | None = None,
+	) -> dict[str, Any]:
 		pass
 
 	def getUiStates(self, allConfigs: dict[str, Any]) -> dict[str, Any]:
@@ -91,14 +98,27 @@ class ChunkedTranslationMixin(TranslationEngine):
 		return (0.4, 1.2)
 
 	@abstractmethod
-	def _translateChunk(self, text: str, langFrom: str, langTo: str, config: dict[str, Any]) -> dict[str, Any]:
+	def _translateChunk(
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
+	) -> dict[str, Any]:
 		pass
 
-	def translate(self, text: str, langFrom: str, langTo: str, config: dict[str, Any], isCancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
+	def translate(
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
+		isCancelled: Callable[[], bool] | None = None,
+	) -> dict[str, Any]:
 		limit = self.maxRequestLength
 		if limit <= 0 or len(text) <= limit:
 			return self._translateChunk(text, langFrom, langTo, config)
-		
+
 		chunks = splitText(text, limit)
 		totalChunks = len(chunks)
 		delayRange = self.requestDelayRange
@@ -109,20 +129,20 @@ class ChunkedTranslationMixin(TranslationEngine):
 			if isCancelled and isCancelled():
 				log.debug("Chunked translation cancelled mid-way.")
 				break
-				
+
 			if not chunk.strip():
 				translatedChunks.append(chunk)
 				continue
-				
+
 			if i > 0 and delayRange:
 				time.sleep(random.uniform(*delayRange))
 
 			leadingWs = len(chunk) - len(chunk.lstrip())
 			trailingWs = len(chunk) - len(chunk.rstrip())
-			
+
 			leadingStr = chunk[:leadingWs] if leadingWs > 0 else ""
 			trailingStr = chunk[-trailingWs:] if trailingWs > 0 else ""
-			
+
 			strippedChunk = chunk.strip()
 			if not strippedChunk:
 				translatedChunks.append(chunk)
@@ -130,18 +150,18 @@ class ChunkedTranslationMixin(TranslationEngine):
 
 			res = self._translateChunk(strippedChunk, langFrom, langTo, config)
 			translatedText = res.get("translation", "").strip()
-			
+
 			translatedChunks.append(leadingStr + translatedText + trailingStr)
-			
+
 			if totalChunks > 1:
 				Beep.reportProgress(i + 1, totalChunks)
 
 			if detectedLang is None and "langDetected" in res:
 				detectedLang = res["langDetected"]
-		
+
 		return {
 			"translation": "".join(translatedChunks),
-			"langDetected": detectedLang
+			"langDetected": detectedLang,
 		}
 
 
@@ -149,8 +169,6 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 	"""
 	Provides a common framework and rules for HTTP-based engines.
 	"""
-
-
 
 	@property
 	@abstractmethod
@@ -160,7 +178,7 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 		forcing all concrete HTTP engines to implement it explicitly.
 		"""
 		raise NotImplementedError(
-			f"""Translation engine '{self.id}' must explicitly implement the 'autoDetectCode' property in a subclass (return None if not supported)."""
+			f"""Translation engine '{self.id}' must explicitly implement the 'autoDetectCode' property in a subclass (return None if not supported).""",
 		)
 
 	@property
@@ -174,7 +192,7 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 		if self.supportsLanguageDetection and autoCode is not None:
 			return autoCode
 		raise NotImplementedError(
-			f"""Translation engine '{self.id}' does not support auto language detection, and must therefore explicitly override the 'defaultSourceLanguage' property in a subclass."""
+			f"""Translation engine '{self.id}' does not support auto language detection, and must therefore explicitly override the 'defaultSourceLanguage' property in a subclass.""",
 		)
 
 	@property
@@ -184,7 +202,7 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 		Forces all concrete HTTP engines to explicitly define their default target language.
 		"""
 		raise NotImplementedError(
-			f"Translation engine '{self.id}' must explicitly implement the 'defaultTargetLanguage' property."
+			f"Translation engine '{self.id}' must explicitly implement the 'defaultTargetLanguage' property.",
 		)
 
 	def getConfigSpec(self) -> list[dict[str, Any]]:
@@ -236,7 +254,7 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 					"min": 1,
 					"max": 60,
 				},
-			]
+			],
 		)
 
 		if self.reportsDetectedLanguage:
@@ -246,7 +264,7 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 					{
 						"id": "enableAutoSwap",
 						"label": _(
-							"Auto-swap if detected source matches target (source must be 'Auto-detect')"
+							"Auto-swap if detected source matches target (source must be 'Auto-detect')",
 						),
 						"type": "checkbox",
 						"default": False,
@@ -258,12 +276,15 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 						"choices": swapChoices,
 						"default": "",
 					},
-				]
+				],
 			)
 		return spec
 
 	def _getFilteredChoices(
-		self, allLangs: dict[str, str], excludeCode: str | None = None, removeAuto: bool = False
+		self,
+		allLangs: dict[str, str],
+		excludeCode: str | None = None,
+		removeAuto: bool = False,
 	) -> dict[str, str]:
 		"""A helper function to create a filtered dictionary of language options based on rules."""
 		choices = allLangs.copy()
@@ -296,14 +317,20 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 			isSwapLangVisible = isAutoFrom and allConfigs.get("enableAutoSwap", False)
 			# Swap-to language (swapLanguage): Rules are the same as for target language; exclude current target and "auto-detect".
 			validSwapLangs = self._getFilteredChoices(
-				allLangs, excludeCode=selectedTo, removeAuto=True
+				allLangs,
+				excludeCode=selectedTo,
+				removeAuto=True,
 			)
 			states["swapLanguage"] = {"visible": isSwapLangVisible, "choices": validSwapLangs}
 		return states
 
 	@abstractmethod
 	def _buildRequestParams(
-		self, text: str, langFrom: str, langTo: str, config: dict[str, Any]
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
 	) -> dict[str, Any]:
 		pass
 
@@ -311,8 +338,13 @@ class BaseHttpEngine(ChunkedTranslationMixin):
 	def _parseResponse(self, responseBody: str) -> dict[str, Any]:
 		pass
 
-
-	def _translateChunk(self, text: str, langFrom: str, langTo: str, config: dict[str, Any]) -> dict[str, Any]:
+	def _translateChunk(
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
+	) -> dict[str, Any]:
 		try:
 			params = self._buildRequestParams(text, langFrom, langTo, config)
 			log.debug(f"Engine '{self.id}' built request params: {params.get('method')} {params.get('url')}")

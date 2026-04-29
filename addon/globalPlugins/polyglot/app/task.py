@@ -66,7 +66,13 @@ class TranslationTask(threading.Thread):
 			engine = engineManager.getEngineById(self.engineId)
 			engineConfig = self.engineConfig
 			autoDetectCode = engine.autoDetectCode
-			firstResult = engine.translate(self.text, self.langFrom, self.langTo, engineConfig, isCancelled=self.isCancelled)
+			firstResult = engine.translate(
+				self.text,
+				self.langFrom,
+				self.langTo,
+				engineConfig,
+				isCancelled=self.isCancelled,
+			)
 			if self.isCancelled():
 				return
 			langDetected = firstResult.get("langDetected")
@@ -84,7 +90,13 @@ class TranslationTask(threading.Thread):
 				if swapLang and swapLang != self.langTo:
 					finalTargetLang = swapLang
 					assert langDetected is not None
-					secondResult = engine.translate(self.text, langDetected, swapLang, engineConfig, isCancelled=self.isCancelled)
+					secondResult = engine.translate(
+						self.text,
+						langDetected,
+						swapLang,
+						engineConfig,
+						isCancelled=self.isCancelled,
+					)
 					if self.isCancelled():
 						return
 					result.update(secondResult)
@@ -94,7 +106,9 @@ class TranslationTask(threading.Thread):
 				if sourceLangForCache != autoDetectCode:
 					if isinstance(sourceLangForCache, str):
 						specificKey = self.cache.buildKey(
-							sourceLangForCache, finalTargetLang, self.text
+							sourceLangForCache,
+							finalTargetLang,
+							self.text,
 						)
 						self.cache.set(specificKey, finalTranslation)
 				if self.langFrom == autoDetectCode:

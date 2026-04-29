@@ -102,7 +102,9 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		return [
 			{
 				"id": "enabled",
-				"label": _("Enable Chrome AI offline engine (requires Chrome 138+, resources released on NVDA exit)"),
+				"label": _(
+					"Enable Chrome AI offline engine (requires Chrome 138+, resources released on NVDA exit)",
+				),
 				"type": "checkbox",
 				"default": True,
 			},
@@ -123,7 +125,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			{
 				"id": "enableAutoSwap",
 				"label": _(
-					"Auto-swap if detected source matches target (source must be 'Auto-detect')"
+					"Auto-swap if detected source matches target (source must be 'Auto-detect')",
 				),
 				"type": "checkbox",
 				"default": False,
@@ -184,8 +186,10 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		if not config.get("enabled", True):
 			log.debug("Chrome AI: engine is disabled, refusing translation request.")
 			raise EngineError(
-				_("Chrome AI offline engine is disabled. "
-				  "Please enable it in the Polyglot settings panel to use.")
+				_(
+					"Chrome AI offline engine is disabled. "
+					"Please enable it in the Polyglot settings panel to use.",
+				),
 			)
 		if isCancelled and isCancelled():
 			return {}
@@ -200,12 +204,13 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			self._bridge.ensureConnection()
 		except CdpError as e:
 			raise EngineError(str(e))
-		
+
 		# Now that pre-checks and connection are established, let the base class handle splitting
 		return super().translate(text, langFrom, langTo, config, isCancelled)
 
 	def _makeDownloadHandler(self, modelLabel: str) -> Callable[[str], None]:
 		"""Builds a console log handler for Chrome model download progress events."""
+
 		def handler(logText: str) -> None:
 			if "[DOWNLOAD_PROGRESS]" in logText:
 				try:
@@ -233,6 +238,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 					cues.Speech.message,
 					_("Download complete."),
 				)
+
 		return handler
 
 	def _toJsStringLiteral(self, value: str) -> str:
@@ -310,7 +316,11 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		raise EngineError(_("Unexpected response from Chrome AI."))
 
 	def _translateChunk(
-		self, text: str, langFrom: str, langTo: str, config: dict[str, Any]
+		self,
+		text: str,
+		langFrom: str,
+		langTo: str,
+		config: dict[str, Any],
 	) -> dict[str, Any]:
 		detectedLang = None
 		if langFrom == "auto":
@@ -405,34 +415,40 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			}
 		elif code == "API_ERR_UNDEFINED":
 			raise EngineError(
-				_("Chrome's Translator API is not available. "
-				  "Please update Chrome to version 138 or later "
-				  "and ensure the TranslationAPI flag is enabled in chrome://flags.")
+				_(
+					"Chrome's Translator API is not available. "
+					"Please update Chrome to version 138 or later "
+					"and ensure the TranslationAPI flag is enabled in chrome://flags.",
+				),
 			)
 		elif code == "DETECTOR_ERR_UNDEFINED":
 			raise EngineError(
-				_("Chrome's LanguageDetector API is not available. "
-				  "Please update Chrome and enable the TranslationAPI flag.")
+				_(
+					"Chrome's LanguageDetector API is not available. "
+					"Please update Chrome and enable the TranslationAPI flag.",
+				),
 			)
 		elif code == "DETECTOR_ERR_UNAVAILABLE":
 			raise EngineError(
-				_("Language detection is not supported in this Chrome installation.")
+				_("Language detection is not supported in this Chrome installation."),
 			)
 		elif code == "DETECTOR_ERR_LOW_CONFIDENCE":
 			confidence = result.get("confidence", 0)
 			raise EngineError(
-				_("Could not confidently detect the source language. "
-				  "Please select a source language instead of Auto-detect. "
-				  "(confidence: {confidence})").format(confidence=confidence)
+				_(
+					"Could not confidently detect the source language. "
+					"Please select a source language instead of Auto-detect. "
+					"(confidence: {confidence})",
+				).format(confidence=confidence),
 			)
 		elif code == "DETECTOR_ERR_EXCEPTION":
-			raise EngineError(_("Language detection error: ") + result.get('message', ''))
+			raise EngineError(_("Language detection error: ") + result.get("message", ""))
 		elif code == "MODEL_STATE_NO":
 			pair = result.get("pair", "?->?")
 			raise EngineError(
-				_("Language pair {pair} is not supported by Chrome's offline models.").format(pair=pair)
+				_("Language pair {pair} is not supported by Chrome's offline models.").format(pair=pair),
 			)
 		elif code == "TRANSLATE_ERR_EXCEPTION":
-			raise EngineError(_("Chrome AI error: ") + result.get('message', _('Unknown error')))
+			raise EngineError(_("Chrome AI error: ") + result.get("message", _("Unknown error")))
 		else:
 			raise EngineError(_("Unexpected response from Chrome AI."))

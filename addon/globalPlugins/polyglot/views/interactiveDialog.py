@@ -11,16 +11,21 @@ from ..services import engineManager
 
 addonHandler.initTranslation()
 
+
 class InteractiveTranslationDialog(DPIScaledDialog):
 	"""
 	A standalone modal dialog for interactive translation.
 	"""
 
 	def __init__(self, parent, manager):
-		super().__init__(parent, title=_("Polyglot Interactive Translation"), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+		super().__init__(
+			parent,
+			title=_("Polyglot Interactive Translation"),
+			style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+		)
 		self.manager = manager
 		self.allEngines = engineManager.getAllEngines()
-		
+
 		# Internal state for dynamic choices
 		self._modeIds = []
 		self._modelIds = []
@@ -28,29 +33,33 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 
 		mainSizer = wx.BoxSizer(wx.VERTICAL)
 		sHelper = guiHelper.BoxSizerHelper(self, orientation=wx.VERTICAL)
-		
+
 		# --- Configuration Area ---
-		self.engineCombo = sHelper.addLabeledControl(_("Translation &engine:"), wx.Choice, choices=[e.name for e in self.allEngines])
+		self.engineCombo = sHelper.addLabeledControl(
+			_("Translation &engine:"),
+			wx.Choice,
+			choices=[e.name for e in self.allEngines],
+		)
 		self.sourceLangCombo = sHelper.addLabeledControl(_("Source language:"), wx.Choice)
 		self.targetLangCombo = sHelper.addLabeledControl(_("Target language:"), wx.Choice)
-		
+
 		self.advancedBox = wx.StaticBox(self, label=_("Current Engine Settings"))
 		self.advancedSizer = wx.StaticBoxSizer(self.advancedBox, wx.VERTICAL)
 		# Use wx.VERTICAL to ensure addLabeledControl correctly treats items as vertical candidates if needed
 		advHelper = guiHelper.BoxSizerHelper(self.advancedBox, orientation=wx.VERTICAL)
-		
+
 		self.modelCombo = advHelper.addLabeledControl(_("Model:"), wx.Choice)
 		self.promptModeCombo = advHelper.addLabeledControl(_("Prompt Template:"), wx.Choice)
 		self.systemPromptCtrl = advHelper.addLabeledControl(_("Custom System Prompt (Role):"), wx.TextCtrl)
 		self.userPromptCtrl = advHelper.addLabeledControl(_("Custom User Prompt (Task):"), wx.TextCtrl)
-		
+
 		# Explicitly set expansion for controls inside the advanced box to match the look of text areas
 		for ctrl in (self.modelCombo, self.promptModeCombo, self.systemPromptCtrl, self.userPromptCtrl):
 			advHelper.sizer.GetItem(ctrl.GetContainingSizer()).SetFlag(wx.EXPAND | wx.TOP)
-		
+
 		self.advancedSizer.Add(advHelper.sizer, 0, wx.EXPAND | wx.ALL, 5)
 		sHelper.addItem(self.advancedSizer)
-		
+
 		# --- Text Areas (Vertical Layout for better expansion) ---
 		sourceLabel = wx.StaticText(self, label=_("Te&xt to translate:"))
 		self.sourceTextCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_PROCESS_ENTER | wx.TE_RICH2)
@@ -60,7 +69,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		sourceSizer.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_VERTICAL)
 		sourceSizer.Add(self.sourceTextCtrl, flag=wx.EXPAND, proportion=1)
 		sHelper.addItem(sourceSizer, flag=wx.EXPAND, proportion=1)
-		
+
 		resultLabel = wx.StaticText(self, label=_("Translation &result:"))
 		self.resultTextCtrl = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
 		self.resultTextCtrl.SetMinSize((-1, 120))
@@ -69,7 +78,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		resultSizer.AddSpacer(guiHelper.SPACE_BETWEEN_ASSOCIATED_CONTROL_VERTICAL)
 		resultSizer.Add(self.resultTextCtrl, flag=wx.EXPAND, proportion=1)
 		sHelper.addItem(resultSizer, flag=wx.EXPAND, proportion=1)
-		
+
 		# --- Buttons ---
 		bHelper = guiHelper.ButtonHelper(wx.HORIZONTAL)
 		self.translateBtn = bHelper.addButton(self, label=_("&Translate"))
@@ -78,13 +87,13 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		self.clearBtn = bHelper.addButton(self, label=_("C&lear"))
 		self.closeBtn = bHelper.addButton(self, id=wx.ID_CLOSE, label=_("&Close"))
 		sHelper.addItem(bHelper)
-		
+
 		# Ensure the main sHelper sizer takes up all available vertical space in the dialog
 		mainSizer.Add(sHelper.sizer, proportion=1, border=10, flag=wx.ALL | wx.EXPAND)
 		self.SetSizer(mainSizer)
 		self.SetMinSize((650, 700))
 		self.SetEscapeId(wx.ID_CLOSE)
-		
+
 		# Initialize engine selection
 		conf = config.getConfig()
 		currentEngineId = conf["engine"]
@@ -94,7 +103,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 				engineIndex = i
 				break
 		self.engineCombo.SetSelection(engineIndex)
-		
+
 		# Bind events
 		self.Bind(wx.EVT_BUTTON, self.onClose, id=wx.ID_CLOSE)
 		self.sourceTextCtrl.Bind(wx.EVT_CHAR_HOOK, self.onSourceTextChar)
@@ -103,10 +112,10 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		self.copyBtn.Bind(wx.EVT_BUTTON, self.onCopy)
 		self.engineCombo.Bind(wx.EVT_CHOICE, self.updateEngineUI)
 		self.promptModeCombo.Bind(wx.EVT_CHOICE, self.onPromptModeChanged)
-		
+
 		# Initial UI population
 		self.updateEngineUI(None)
-		
+
 		self.Layout()
 		self.Centre()
 		self.sourceTextCtrl.SetFocus()
@@ -125,7 +134,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		conf = config.getConfig()
 		engineConf = conf["engines"].get(engine.id, {})
 		spec = engine.getConfigSpec()
-		
+
 		promptModes = {}
 		models = {}
 		for item in spec:
@@ -133,7 +142,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 				promptModes = item.get("choices", {}).copy()
 			elif item["id"] in ("modelNamePreset", "modelPreset"):
 				models = item.get("choices", {}).copy()
-		
+
 		if "custom" in models:
 			customName = engineConf.get("modelNameCustom", "").strip()
 			if not customName:
@@ -144,7 +153,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 
 		isLLM = bool(promptModes)
 		self.advancedBox.Enable(isLLM)
-		
+
 		if models:
 			self.modelCombo.Enable(True)
 			sortedModels = sorted(models.items(), key=lambda x: x[1])
@@ -179,7 +188,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		langNames = [x[1] for x in sortedLangs]
 		self.sourceLangCombo.SetItems(langNames)
 		self.targetLangCombo.SetItems(langNames)
-		
+
 		defFrom = engineConf.get("langFrom", engine.defaultSourceLanguage)
 		defTo = engineConf.get("langTo", engine.defaultTargetLanguage)
 		try:
@@ -190,7 +199,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 			self.targetLangCombo.SetSelection(self._langCodes.index(defTo))
 		except ValueError:
 			self.targetLangCombo.SetSelection(0)
-			
+
 		self.onPromptModeChanged(None)
 
 	def onPromptModeChanged(self, event):
@@ -203,8 +212,8 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 			return
 
 		modeId = self._modeIds[self.promptModeCombo.GetSelection()]
-		isCustom = (modeId == "custom")
-		
+		isCustom = modeId == "custom"
+
 		if isCustom:
 			conf = config.getConfig()
 			engineConf = conf["engines"].get(engine.id, {})
@@ -225,26 +234,26 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		text = self.sourceTextCtrl.GetValue().strip()
 		if not text:
 			return
-			
+
 		engine = self.getSelectedEngine()
 		langFrom = self._langCodes[self.sourceLangCombo.GetSelection()]
 		langTo = self._langCodes[self.targetLangCombo.GetSelection()]
-		
+
 		# Sync all UI choices to global config
 		conf = config.getConfig()
 		if conf["engine"] != engine.id:
 			conf["engine"] = engine.id
-			
+
 		if engine.id not in conf["engines"]:
 			conf["engines"][engine.id] = {}
 		engineConf = conf["engines"][engine.id]
-		
+
 		engineConf["langFrom"] = langFrom
 		engineConf["langTo"] = langTo
-		
+
 		if self.modelCombo.IsEnabled():
 			engineConf["modelNamePreset"] = self._modelIds[self.modelCombo.GetSelection()]
-		
+
 		if self.promptModeCombo.IsEnabled():
 			modeId = self._modeIds[self.promptModeCombo.GetSelection()]
 			engineConf["promptMode"] = modeId
@@ -255,7 +264,7 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 		self.resultTextCtrl.SetValue(_("Translating..."))
 		self.resultTextCtrl.SetFocus()
 		self.translateBtn.Disable()
-		
+
 		def onSuccess(resultText):
 			wx.CallAfter(self.onTranslationDone, resultText)
 
@@ -263,7 +272,10 @@ class InteractiveTranslationDialog(DPIScaledDialog):
 			wx.CallAfter(self.onTranslationError, errorMessage)
 
 		self.manager.requestTranslation(
-			text, onSuccess=onSuccess, onError=onError, showStatus=True
+			text,
+			onSuccess=onSuccess,
+			onError=onError,
+			showStatus=True,
 		)
 
 	def onTranslationDone(self, resultText):
