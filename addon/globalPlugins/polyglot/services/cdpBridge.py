@@ -97,14 +97,19 @@ class CdpBridge:
 
 	def startBrowser(self) -> None:
 		"""Starts the managed headless Chrome instance if it is not already running."""
-		if self._chromeProcess and self._chromeProcess.poll() is None:
-			return
+		if self._chromeProcess:
+			if self._chromeProcess.poll() is None:
+				return
+			self._chromeProcess = None
 		self._debugPort = None
+		self._targetId = None
 		chromePath = self._getChromePath()
 		if not chromePath:
 			raise CdpError("Chrome not found. Please install Google Chrome.")
 		os.makedirs(USER_DATA_DIR, exist_ok=True)
 		pageUrl = self._preparePageUrl()
+		if self._reuseExistingBrowser():
+			return
 		try:
 			os.remove(DEVTOOLS_ACTIVE_PORT_FILE)
 		except FileNotFoundError:
@@ -133,6 +138,35 @@ class CdpBridge:
 		except Exception as e:
 			raise CdpError(f"Failed to start Chrome: {e}")
 
+	def _readDevToolsActivePort(self) -> int | None:
+		"""Reads the current Chrome DevTools port file if it exists."""
+		try:
+			with open(DEVTOOLS_ACTIVE_PORT_FILE, "r", encoding="utf-8") as portFile:
+				firstLine = portFile.readline().strip()
+				if firstLine:
+					return int(firstLine)
+		except (FileNotFoundError, ValueError, OSError):
+			return None
+		return None
+
+	def _reuseExistingBrowser(self) -> bool:
+		"""Reuses an already-running managed Chrome instance when its CDP port is still live."""
+		port = self._readDevToolsActivePort()
+		if port is None:
+			return False
+		versionUrl = f"http://127.0.0.1:{port}/json/version"
+		for _ in range(10):
+			try:
+				with urllib.request.urlopen(versionUrl, timeout=0.5) as response:
+					data = json.loads(response.read().decode("utf-8"))
+				if isinstance(data, dict):
+					self._debugPort = port
+					log.info(f"Reusing existing Chrome CDP endpoint on port {port}.")
+					return True
+			except Exception:
+				time.sleep(0.2)
+		return False
+
 	def _preparePageUrl(self) -> str:
 		"""Creates a local secure-context page and returns its file URL."""
 		html = '<!doctype html><meta charset="utf-8"><title>Polyglot Chrome AI</title>'
@@ -146,15 +180,18 @@ class CdpBridge:
 			return self._debugPort
 		for _ in range(40):
 			if self._chromeProcess and self._chromeProcess.poll() is not None:
-				raise CdpError(f"Chrome exited before CDP became available: {self._chromeProcess.returncode}")
-			try:
-				with open(DEVTOOLS_ACTIVE_PORT_FILE, "r", encoding="utf-8") as portFile:
-					firstLine = portFile.readline().strip()
-					if firstLine:
-						self._debugPort = int(firstLine)
+				exitCode = self._chromeProcess.returncode
+				self._chromeProcess = None
+				if exitCode == 21:
+					if self._reuseExistingBrowser() and self._debugPort is not None:
 						return self._debugPort
-			except (FileNotFoundError, ValueError, OSError):
-				time.sleep(0.25)
+					raise CdpError("Chrome AI profile is already in use by another Chrome process.")
+				raise CdpError(f"Chrome exited before CDP became available: {exitCode}")
+			port = self._readDevToolsActivePort()
+			if port is not None:
+				self._debugPort = port
+				return self._debugPort
+			time.sleep(0.25)
 		raise CdpError("Timeout waiting for Chrome DevToolsActivePort.")
 
 	def _readJsonEndpoint(self, path: str, method: str = "GET") -> Any:
@@ -165,9 +202,33 @@ class CdpBridge:
 		with urllib.request.urlopen(req, timeout=1) as response:
 			return json.loads(response.read().decode("utf-8"))
 
-	def _createPageTarget(self) -> str | None:
+	def _findPageTarget(self, pageUrl: str) -> str | None:
+		"""Finds an existing page target for the Chrome AI page if it is already open."""
+		try:
+			targets = self._readJsonEndpoint("/json/list")
+		except Exception:
+			return None
+		if not isinstance(targets, list):
+			return None
+		for target in targets:
+			if not isinstance(target, dict):
+				continue
+			if target.get("type") != "page":
+				continue
+			wsUrl = target.get("webSocketDebuggerUrl")
+			if not isinstance(wsUrl, str):
+				continue
+			targetId = target.get("id")
+			if self._targetId and targetId and str(targetId) == self._targetId:
+				return wsUrl
+			if target.get("url") == pageUrl:
+				self._targetId = str(targetId) if targetId else None
+				return wsUrl
+		return None
+
+	def _createPageTarget(self, pageUrl: str) -> str | None:
 		"""Creates a page target and returns its WebSocket URL if available."""
-		quotedUrl = urllib.parse.quote(self._preparePageUrl(), safe="")
+		quotedUrl = urllib.parse.quote(pageUrl, safe="")
 		try:
 			target = self._readJsonEndpoint(f"/json/new?{quotedUrl}", method="PUT")
 		except Exception:
@@ -182,10 +243,14 @@ class CdpBridge:
 		return None
 
 	def _getWebSocketUrl(self) -> str:
-		"""Creates and returns a page target WebSocket URL from the managed Chrome process."""
+		"""Returns a page target WebSocket URL from the managed Chrome process."""
+		pageUrl = self._preparePageUrl()
 		for _ in range(20):
 			try:
-				wsUrl = self._createPageTarget()
+				wsUrl = self._findPageTarget(pageUrl)
+				if wsUrl:
+					return wsUrl
+				wsUrl = self._createPageTarget(pageUrl)
 				if wsUrl:
 					return wsUrl
 			except Exception:

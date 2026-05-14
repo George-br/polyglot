@@ -32,15 +32,15 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 	name = _("Chrome AI (Offline)")
 	_downloadLock = threading.Lock()
 	_isPreparingModel = False
-	_DETECTION_CONFIDENCE_THRESHOLD = 0.35
-	_MAX_MODEL_PREPARATION_RETRIES = 2
-	_MAX_CACHED_TRANSLATORS = 4
+	_MAX_TRANSIENT_RETRIES = 2
 	_ENGLISH_EM_DASH_PATTERN = re.compile(r"[ \t]*\u2014[ \t]*")
 	_TRANSIENT_ERROR_MARKERS = (
 		"AbortError",
 		"InvalidStateError",
 		"NetworkError",
 		"NotAllowedError",
+		"UnknownError",
+		"Other generic failures occurred",
 		"not allowed",
 		"temporarily",
 		"timed out",
@@ -281,14 +281,14 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		return lowerCode.split("-", 1)[0]
 
 	def _shouldRetryResult(self, result: dict[str, Any]) -> bool:
-		"""Returns whether a Chrome AI result looks like a cold-start transient failure."""
+		"""Returns whether a Chrome AI result looks like a transient failure."""
 		code = result.get("code")
 		if code in ("API_ERR_UNDEFINED", "DETECTOR_ERR_UNDEFINED", "PARSE_ERR"):
 			return True
 		if code not in ("DETECTOR_ERR_EXCEPTION", "TRANSLATE_ERR_EXCEPTION"):
 			return False
-		message = str(result.get("message", ""))
-		return any(marker.lower() in message.lower() for marker in self._TRANSIENT_ERROR_MARKERS)
+		message = f"{result.get('name', '')} {result.get('message', '')}".lower()
+		return any(marker.lower() in message for marker in self._TRANSIENT_ERROR_MARKERS)
 
 	def _evaluateChromeAiScript(
 		self,
@@ -296,19 +296,19 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		onConsoleLog: Callable[[str], None],
 		operationName: str,
 	) -> dict[str, Any]:
-		"""Evaluates a Chrome AI script with a bounded cold-start retry."""
+		"""Evaluates a Chrome AI script with a bounded transient retry."""
 		lastResult: dict[str, Any] | None = None
-		for attempt in range(self._MAX_MODEL_PREPARATION_RETRIES + 1):
+		for attempt in range(self._MAX_TRANSIENT_RETRIES + 1):
 			try:
 				result = self._bridge.evaluateSync(jsPayload, onConsoleLog=onConsoleLog)
 			except CdpError as e:
-				if attempt >= self._MAX_MODEL_PREPARATION_RETRIES:
+				if attempt >= self._MAX_TRANSIENT_RETRIES:
 					raise EngineError(str(e)) from e
-				log.warning(f"Chrome AI: {operationName} CDP error on cold-start attempt {attempt + 1}: {e}")
+				log.warning(f"Chrome AI: {operationName} CDP error on transient attempt {attempt + 1}: {e}")
 				time.sleep(0.4 * (attempt + 1))
 				continue
 			lastResult = result
-			if not self._shouldRetryResult(result) or attempt >= self._MAX_MODEL_PREPARATION_RETRIES:
+			if not self._shouldRetryResult(result) or attempt >= self._MAX_TRANSIENT_RETRIES:
 				return result
 			log.warning(f"Chrome AI: retrying {operationName} after transient result: {result}")
 			time.sleep(0.4 * (attempt + 1))
@@ -321,7 +321,6 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		so its model download won't consume the activation needed by the Translator.
 		"""
 		inputText = self._toJsStringLiteral(text)
-		confidenceThreshold = self._DETECTION_CONFIDENCE_THRESHOLD
 		jsPayload = f"""
 		(async () => {{
 			const makeError = (e) => {{
@@ -361,10 +360,10 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 					globalThis._aiLanguageDetector = await LanguageDetector.create(detOptions);
 					if (downloadStates.has(detAvail)) {{
 						console.log('[MODEL_END]');
-					}}
+				}}
 				}}
 				const detections = await globalThis._aiLanguageDetector.detect(inputText);
-				if (detections.length > 0 && detections[0].confidence >= {confidenceThreshold}) {{
+				if (detections.length > 0) {{
 					return JSON.stringify({{
 						code: 'SUCCESS',
 						lang: detections[0].detectedLanguage,
@@ -445,20 +444,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 				return JSON.stringify({{code: 'SAME_LANGUAGE'}});
 			}}
 			globalThis._aiTranslators = globalThis._aiTranslators || {{}};
-			globalThis._aiTranslatorOrder = globalThis._aiTranslatorOrder || [];
 			const key = sourceLang + '-' + targetLang;
-			const rememberTranslator = () => {{
-				globalThis._aiTranslatorOrder = globalThis._aiTranslatorOrder.filter((item) => item !== key);
-				globalThis._aiTranslatorOrder.push(key);
-				while (globalThis._aiTranslatorOrder.length > {self._MAX_CACHED_TRANSLATORS}) {{
-					const oldKey = globalThis._aiTranslatorOrder.shift();
-					const oldTranslator = globalThis._aiTranslators[oldKey];
-					if (oldTranslator && typeof oldTranslator.destroy === 'function') {{
-						oldTranslator.destroy();
-					}}
-					delete globalThis._aiTranslators[oldKey];
-				}}
-			}};
 			try {{
 				if (!globalThis._aiTranslators[key]) {{
 					const options = {{ sourceLanguage: sourceLang, targetLanguage: targetLang }};
@@ -483,7 +469,6 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 						console.log('[MODEL_END]');
 					}}
 				}}
-				rememberTranslator();
 				// Chrome AI models discard newlines; translate line-by-line to preserve structure.
 				const lines = inputText.split('\\n');
 				const translatedLines = [];
@@ -498,7 +483,6 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 				return JSON.stringify({{code: 'SUCCESS', data: result}});
 			}} catch (err) {{
 				delete globalThis._aiTranslators[key];
-				globalThis._aiTranslatorOrder = globalThis._aiTranslatorOrder.filter((item) => item !== key);
 				const error = makeError(err);
 				return JSON.stringify({{
 					code: 'TRANSLATE_ERR_EXCEPTION',
