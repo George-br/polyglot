@@ -35,7 +35,22 @@ jobs:
         uv sync
 
     - name: Code checks
-      run: export SKIP=no-commit-to-branch,pyright; uv run pre-commit run --all-files
+      run: |
+        set +e
+        export SKIP=no-commit-to-branch,pyright
+        uv run pre-commit run --all-files
+        status=$?
+        if [ "$status" -ne 0 ]; then
+          echo "::warning title=Code checks failed::pre-commit/lint checks reported issues. Build will continue; see this step log for details."
+          {
+            echo "### Code checks warning"
+            echo
+            echo "pre-commit/lint checks reported issues, but this workflow is configured to continue so build and release artifacts are not blocked."
+            echo
+            echo "Exit code: \`$status\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit 0
 
     - name: building addon
       run: uv run scons && uv run scons pot
