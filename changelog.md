@@ -1,4 +1,3 @@
-### 0.9.0
+### 0.9.1
 
-- Add the ChromeAI offline model manager and installation flow.
-- Change the translation command layer gesture to NVDA+Alt+Z and document command layer help.
+- Require an explicit source language for ChromeAI offline translation.
