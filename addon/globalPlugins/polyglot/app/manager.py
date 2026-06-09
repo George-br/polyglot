@@ -362,6 +362,8 @@ class TranslationManager:
 		onError: OnErrorCallback = None,
 	) -> None:
 		cues.stopPeriodicCue()
+		if result.get("cancelled"):
+			return
 
 		def task() -> None:
 			error = result.get("error")

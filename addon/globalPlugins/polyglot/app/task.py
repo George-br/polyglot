@@ -8,7 +8,7 @@ from typing import Any
 from logHandler import log
 
 from ..common.cache import TranslationCache
-from ..common.exceptions import EngineError
+from ..common.exceptions import EngineError, SilentTranslationCancel
 from ..services import engineManager
 
 
@@ -119,6 +119,8 @@ class TranslationTask(threading.Thread):
 						self.cache.set(autoKey, finalTranslation)
 		except EngineError as e:
 			result["error"] = e
+		except SilentTranslationCancel:
+			result["cancelled"] = True
 		except Exception as e:
 			log.error("An unexpected error occurred inside TranslationTask.run.", exc_info=True)
 			result["error"] = e

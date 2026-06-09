@@ -47,6 +47,14 @@ class ResponseParsingError(EngineError):
 	pass
 
 
+class SilentTranslationCancel(Exception):
+	"""
+	Raised when a translation task should stop without user-facing failure output.
+	"""
+
+	pass
+
+
 class AuthenticationError(ApiResponseError):
 	"""
 	A specific error for authentication failures.

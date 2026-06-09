@@ -19,8 +19,9 @@ import addonHandler
 import queueHandler
 from logHandler import log
 
-from ...common.exceptions import EngineError
+from ...common.exceptions import EngineError, SilentTranslationCancel
 from ...common import cues, languages
+from ...modelManager.service import getModelManagerService
 from ..engine import ChunkedTranslationMixin
 from ..cdpBridge import CdpBridge, CdpError
 
@@ -32,6 +33,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 	name = _("Chrome AI (Offline)")
 	_downloadLock = threading.Lock()
 	_isPreparingModel = False
+	_MODEL_PREPARATION_POLL_INTERVAL = 0.1
 	_MAX_TRANSIENT_RETRIES = 2
 	_ENGLISH_EM_DASH_PATTERN = re.compile(r"[ \t]*\u2014[ \t]*")
 	_TRANSIENT_ERROR_MARKERS = (
@@ -186,6 +188,33 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		# Local model, no need for delay between chunks
 		return (0, 0)
 
+	def _waitForModelPreparation(self, isCancelled: Callable[[], bool] | None) -> bool:
+		"""Waits for another request's model preparation to finish before translating."""
+		with self._downloadLock:
+			isPreparing = ChromeAiEngine._isPreparingModel
+		if not isPreparing:
+			return True
+		log.debug("Chrome AI: model preparation in progress, waiting before translating.")
+		while True:
+			if isCancelled and isCancelled():
+				return False
+			with self._downloadLock:
+				if not ChromeAiEngine._isPreparingModel:
+					return True
+			time.sleep(self._MODEL_PREPARATION_POLL_INTERVAL)
+
+	def _ensureNativeModelReady(self, langFrom: str, langTo: str) -> None:
+		"""Prompt for native model installation when the required package is missing."""
+		if langFrom == self.autoDetectCode or langFrom == langTo:
+			return
+		try:
+			shouldContinue = getModelManagerService().ensureModelForPairInteractive(langFrom, langTo)
+		except Exception:
+			log.error("Chrome AI: native model manager check failed; falling back to Chrome.", exc_info=True)
+			return
+		if not shouldContinue:
+			raise SilentTranslationCancel()
+
 	def translate(
 		self,
 		text: str,
@@ -199,17 +228,17 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			raise EngineError(
 				_(
 					"Chrome AI offline engine is disabled. "
-					"Please enable it in the Polyglot settings panel to use.",
+					"Enable it in the Polyglot settings panel before using it.",
 				),
 			)
 		if isCancelled and isCancelled():
 			return {}
-		# If model preparation is in progress, pass through the original text
-		# to avoid silence and prevent a cascade of parallel attempts.
-		with self._downloadLock:
-			if ChromeAiEngine._isPreparingModel:
-				log.debug("Chrome AI: model preparation in progress, passing through original text.")
-				return {"translation": text, "langDetected": None, "noCache": True}
+		if langFrom != self.autoDetectCode:
+			self._ensureNativeModelReady(langFrom, langTo)
+			if isCancelled and isCancelled():
+				return {}
+		if not self._waitForModelPreparation(isCancelled):
+			return {}
 		log.debug(f"Chrome AI: translate {len(text)} chars, {langFrom}->{langTo}")
 		try:
 			self._bridge.ensureConnection()
@@ -403,7 +432,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 				self._parseCdpResult(result, "")
 			return {"sourceLang": str(sourceLang)}
 		self._parseCdpResult(result, "")
-		raise EngineError(_("Unexpected response from Chrome AI."))
+		raise EngineError(_("Chrome AI returned an unexpected response."))
 
 	def _translateChunk(
 		self,
@@ -415,8 +444,12 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		detectedLang = None
 		if langFrom == "auto":
 			detectResult = self._detectLanguage(text)
-			langFrom = detectResult["sourceLang"]
+			detectedSourceLang = detectResult["sourceLang"]
+			if not detectedSourceLang:
+				raise EngineError(_("Chrome AI returned an unexpected response."))
+			langFrom = detectedSourceLang
 			detectedLang = langFrom
+		self._ensureNativeModelReady(langFrom, langTo)
 		translationText = self._normalizeSourceTextForTranslation(text, langFrom)
 		inputText = self._toJsStringLiteral(translationText)
 		sourceLang = self._toJsStringLiteral(langFrom)
@@ -544,7 +577,7 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			raise EngineError(
 				# Translators: Error message when Chrome AI is running on a page that cannot access the API.
 				_(
-					"Chrome AI requires a secure page context. "
+					"Chrome AI must run in a secure page context. "
 					"Please restart NVDA and try the Chrome AI engine again.",
 				),
 			)
@@ -556,8 +589,8 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 			confidence = result.get("confidence", 0)
 			raise EngineError(
 				_(
-					"Could not confidently detect the source language. "
-					"Please select a source language instead of Auto-detect. "
+					"The source language could not be detected confidently. "
+					"Select a source language instead of Auto-detect. "
 					"(confidence: {confidence})",
 				).format(confidence=confidence),
 			)
@@ -573,4 +606,4 @@ class ChromeAiEngine(ChunkedTranslationMixin):
 		elif code == "TRANSLATE_ERR_EXCEPTION":
 			raise EngineError(_("Chrome AI error: ") + result.get("message", _("Unknown error")))
 		else:
-			raise EngineError(_("Unexpected response from Chrome AI."))
+			raise EngineError(_("Chrome AI returned an unexpected response."))
