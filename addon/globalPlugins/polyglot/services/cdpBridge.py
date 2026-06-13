@@ -53,7 +53,7 @@ class CdpBridge:
 	_nextMsgId = 0
 	_msgIdLock = threading.Lock()
 	_debugPort: int | None = None
-	_staleDebugPort: int | None = None
+	_staleDevToolsActivePort: tuple[int, str] | None = None
 	_targetId: str | None = None
 	_ownsBrowser = False
 
@@ -111,7 +111,7 @@ class CdpBridge:
 			raise CdpError("Chrome not found. Please install Google Chrome.")
 		os.makedirs(USER_DATA_DIR, exist_ok=True)
 		pageUrl = self._preparePageUrl()
-		self._staleDebugPort = self._readDevToolsActivePort()
+		self._staleDevToolsActivePort = self._readDevToolsActivePort()
 		try:
 			os.remove(DEVTOOLS_ACTIVE_PORT_FILE)
 		except FileNotFoundError:
@@ -142,22 +142,24 @@ class CdpBridge:
 			self._ownsBrowser = False
 			raise CdpError(f"Failed to start Chrome: {e}")
 
-	def _readDevToolsActivePort(self) -> int | None:
-		"""Reads the current Chrome DevTools port file if it exists."""
+	def _readDevToolsActivePort(self) -> tuple[int, str] | None:
+		"""Read Chrome's DevToolsActivePort port and browser path if available."""
 		try:
 			with open(DEVTOOLS_ACTIVE_PORT_FILE, "r", encoding="utf-8") as portFile:
 				firstLine = portFile.readline().strip()
-				if firstLine:
-					return int(firstLine)
+				secondLine = portFile.readline().strip()
+				if firstLine and secondLine:
+					return int(firstLine), secondLine
 		except (FileNotFoundError, ValueError, OSError):
 			return None
 		return None
 
-	def _writeDevToolsActivePort(self, port: int) -> None:
+	def _writeDevToolsActivePort(self, devToolsActivePort: tuple[int, str]) -> None:
 		"""Restore the DevToolsActivePort file for a reused Chrome endpoint."""
+		port, browserPath = devToolsActivePort
 		try:
 			with open(DEVTOOLS_ACTIVE_PORT_FILE, "w", encoding="utf-8") as portFile:
-				portFile.write(f"{port}\n")
+				portFile.write(f"{port}\n{browserPath}\n")
 		except OSError:
 			log.warning("Could not restore Chrome DevToolsActivePort file.", exc_info=True)
 
@@ -170,16 +172,17 @@ class CdpBridge:
 
 	def _reuseBrowserAtPort(
 		self,
-		port: int,
+		devToolsActivePort: tuple[int, str],
 		attempts: int = 10,
 		timeout: float = 0.5,
 		retryDelay: float = 0.2,
 	) -> bool:
 		"""Reuse an already-running managed Chrome debugging endpoint at a known port."""
+		port, browserPath = devToolsActivePort
 		for attempt in range(attempts):
 			try:
 				versionInfo = self._readJsonFromPort(port, "/json/version", timeout=timeout)
-				if not isinstance(versionInfo, dict):
+				if not isinstance(versionInfo, dict) or not self._matchesBrowserPath(versionInfo, browserPath):
 					if attempt + 1 < attempts and retryDelay:
 						time.sleep(retryDelay)
 					continue
@@ -192,6 +195,13 @@ class CdpBridge:
 					time.sleep(retryDelay)
 		log.warning(f"Could not reuse stale Chrome CDP endpoint on port {port}.")
 		return False
+
+	def _matchesBrowserPath(self, versionInfo: dict[str, Any], browserPath: str) -> bool:
+		"""Return whether /json/version matches the saved browser WebSocket path."""
+		browserWsUrl = versionInfo.get("webSocketDebuggerUrl")
+		if not isinstance(browserWsUrl, str):
+			return False
+		return urllib.parse.urlparse(browserWsUrl).path == browserPath
 
 	def _preparePageUrl(self) -> str:
 		"""Creates a local secure-context page and returns its file URL."""
@@ -210,21 +220,21 @@ class CdpBridge:
 				self._chromeProcess = None
 				self._ownsBrowser = False
 				if exitCode == 21:
-					staleDebugPort = self._staleDebugPort
-					self._staleDebugPort = None
+					staleDevToolsActivePort = self._staleDevToolsActivePort
+					self._staleDevToolsActivePort = None
 					if (
-						staleDebugPort is not None
-						and self._reuseBrowserAtPort(staleDebugPort)
+						staleDevToolsActivePort is not None
+						and self._reuseBrowserAtPort(staleDevToolsActivePort)
 						and self._debugPort is not None
 					):
-						self._writeDevToolsActivePort(staleDebugPort)
+						self._writeDevToolsActivePort(staleDevToolsActivePort)
 						return self._debugPort
 					raise CdpError("Chrome AI profile is already in use by another Chrome process.")
 				raise CdpError(f"Chrome exited before CDP became available: {exitCode}")
-			port = self._readDevToolsActivePort()
-			if port is not None:
-				self._debugPort = port
-				self._staleDebugPort = None
+			devToolsActivePort = self._readDevToolsActivePort()
+			if devToolsActivePort is not None:
+				self._debugPort = devToolsActivePort[0]
+				self._staleDevToolsActivePort = None
 				return self._debugPort
 			time.sleep(0.25)
 		raise CdpError("Timeout waiting for Chrome DevToolsActivePort.")
@@ -387,11 +397,11 @@ class CdpBridge:
 			return None
 		return str(commandLine) if commandLine else None
 
-	def _isManagedChromeProcess(self, processId: int) -> bool:
-		"""Returns whether a process command line matches Polyglot's managed Chrome."""
+	def _isManagedChromeProcess(self, processId: int) -> bool | None:
+		"""Return whether a process matches Polyglot's managed Chrome, or None if unknown."""
 		commandLine = self._getProcessCommandLine(processId)
 		if commandLine is None:
-			return False
+			return None
 		normalizedCommandLine = commandLine.replace("/", "\\").replace('"', "").casefold()
 		normalizedUserDataDir = os.path.normpath(USER_DATA_DIR).replace("/", "\\").casefold()
 		return (
@@ -485,23 +495,30 @@ class CdpBridge:
 			elif self._chromeProcess.poll() is not None:
 				log.debug(f"Chrome CDP process {processId} has already exited.")
 			else:
-				if not self._isManagedChromeProcess(processId):
+				isManagedProcess = self._isManagedChromeProcess(processId)
+				if isManagedProcess is False:
 					log.warning(
 						f"Chrome process {processId} did not match Polyglot ownership checks; "
-						"terminating because it was started by this bridge.",
+						"leaving it running.",
 					)
-				log.info(f"Terminating Chrome CDP process {processId}.")
-				try:
-					self._chromeProcess.terminate()
-					self._chromeProcess.wait(timeout=5)
-				except subprocess.TimeoutExpired:
-					log.warning("Chrome did not exit gracefully, force killing.")
-					self._chromeProcess.kill()
-					self._chromeProcess.wait(timeout=3)
-				except Exception:
-					pass
+				else:
+					if isManagedProcess is None:
+						log.warning(
+							f"Could not verify Chrome process {processId}; "
+							"terminating because it was started by this bridge.",
+						)
+					log.info(f"Terminating Chrome CDP process {processId}.")
+					try:
+						self._chromeProcess.terminate()
+						self._chromeProcess.wait(timeout=5)
+					except subprocess.TimeoutExpired:
+						log.warning("Chrome did not exit gracefully, force killing.")
+						self._chromeProcess.kill()
+						self._chromeProcess.wait(timeout=3)
+					except Exception:
+						pass
 			self._chromeProcess = None
 			self._debugPort = None
-			self._staleDebugPort = None
+			self._staleDevToolsActivePort = None
 			self._targetId = None
 			self._ownsBrowser = False
