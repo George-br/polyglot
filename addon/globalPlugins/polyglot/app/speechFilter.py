@@ -49,8 +49,6 @@ _TRANSLATABLE_KEYS = (
 _origGetPropertiesSpeech: Callable | None = None
 _origGetFormatFieldSpeech: Callable | None = None
 _origGetControlFieldSpeech: Callable | None = None
-_origSpeakMessage: Callable | None = None
-_origPackageSpeakMessage: Callable | None = None
 _origGetSelectionMessageSpeech: Callable | None = None
 _origPackageGetSelectionMessageSpeech: Callable | None = None
 _origGetIndentationSpeech: Callable | None = None
@@ -103,13 +101,6 @@ def _hookedGetControlFieldSpeech(attrs=None, *args, **kwargs):
 		else:
 			new_result.append(s)
 	return new_result
-
-
-def _hookedSpeakMessage(text: str, priority=None) -> None:
-	"""Speaks NVDA messages without treating them as translatable document text."""
-	sequence = speech.speech._getSpeakMessageSpeech(text)
-	if sequence:
-		speech.speech.speak(_markStringsUntranslatable(sequence), symbolLevel=None, priority=priority)
 
 
 def _hookedGetSelectionMessageSpeech(message: str, text: str | list[Any]) -> list[Any]:
@@ -166,7 +157,6 @@ class SpeechFilter:
 		self._patchGetPropertiesSpeech()
 		self._patchGetFormatFieldSpeech()
 		self._patchGetControlFieldSpeech()
-		self._patchSpeakMessage()
 		self._patchGetSelectionMessageSpeech()
 		self._patchGetIndentationSpeech()
 
@@ -174,7 +164,6 @@ class SpeechFilter:
 		"""Unregisters the speech filter, cue suppression hook, and restores speech hooks."""
 		self._unpatchGetIndentationSpeech()
 		self._unpatchGetSelectionMessageSpeech()
-		self._unpatchSpeakMessage()
 		self._unpatchGetControlFieldSpeech()
 		self._unpatchGetFormatFieldSpeech()
 		self._unpatchGetPropertiesSpeech()
@@ -231,24 +220,6 @@ class SpeechFilter:
 			speech.speech.getControlFieldSpeech = _origGetControlFieldSpeech
 			speech.getControlFieldSpeech = _origGetControlFieldSpeech
 			_origGetControlFieldSpeech = None
-
-	def _patchSpeakMessage(self) -> None:
-		"""Patches message speech so NVDA status messages are not auto-translated."""
-		global _origSpeakMessage, _origPackageSpeakMessage
-		_origSpeakMessage = speech.speech.speakMessage
-		_origPackageSpeakMessage = speech.speakMessage
-		speech.speech.speakMessage = _hookedSpeakMessage
-		speech.speakMessage = _hookedSpeakMessage
-
-	def _unpatchSpeakMessage(self) -> None:
-		"""Restores ``speakMessage`` at both levels."""
-		global _origSpeakMessage, _origPackageSpeakMessage
-		if _origSpeakMessage is not None:
-			speech.speech.speakMessage = _origSpeakMessage
-			_origSpeakMessage = None
-		if _origPackageSpeakMessage is not None:
-			speech.speakMessage = _origPackageSpeakMessage
-			_origPackageSpeakMessage = None
 
 	def _patchGetSelectionMessageSpeech(self) -> None:
 		"""Patches selection speech so only selected text is translated."""
