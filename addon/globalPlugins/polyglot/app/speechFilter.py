@@ -48,6 +48,13 @@ _TRANSLATABLE_KEYS = (
 _origGetPropertiesSpeech: Callable | None = None
 _origGetFormatFieldSpeech: Callable | None = None
 _origGetControlFieldSpeech: Callable | None = None
+_origSpeakMessage: Callable | None = None
+_origPackageSpeakMessage: Callable | None = None
+
+
+def _markStringsUntranslatable(sequence: list[Any]) -> list[Any]:
+	"""Marks all strings in a speech sequence as NVDA metadata."""
+	return [_UntranslatableString(s) if isinstance(s, str) else s for s in sequence]
 
 
 def _hookedGetPropertiesSpeech(reason=speech.speech.OutputReason.QUERY, **kwargs):
@@ -93,6 +100,13 @@ def _hookedGetControlFieldSpeech(attrs=None, *args, **kwargs):
 	return new_result
 
 
+def _hookedSpeakMessage(text: str, priority=None) -> None:
+	"""Speaks NVDA messages without treating them as translatable document text."""
+	sequence = speech.speech._getSpeakMessageSpeech(text)
+	if sequence:
+		speech.speech.speak(_markStringsUntranslatable(sequence), symbolLevel=None, priority=priority)
+
+
 class SpeechFilter:
 	# Annotate instance variables at the class level
 	manager: TranslationManager
@@ -116,9 +130,11 @@ class SpeechFilter:
 		self._patchGetPropertiesSpeech()
 		self._patchGetFormatFieldSpeech()
 		self._patchGetControlFieldSpeech()
+		self._patchSpeakMessage()
 
 	def unregister(self) -> None:
 		"""Unregisters the speech filter, cue suppression hook, and restores speech hooks."""
+		self._unpatchSpeakMessage()
 		self._unpatchGetControlFieldSpeech()
 		self._unpatchGetFormatFieldSpeech()
 		self._unpatchGetPropertiesSpeech()
@@ -175,6 +191,24 @@ class SpeechFilter:
 			speech.speech.getControlFieldSpeech = _origGetControlFieldSpeech
 			speech.getControlFieldSpeech = _origGetControlFieldSpeech
 			_origGetControlFieldSpeech = None
+
+	def _patchSpeakMessage(self) -> None:
+		"""Patches message speech so NVDA status messages are not auto-translated."""
+		global _origSpeakMessage, _origPackageSpeakMessage
+		_origSpeakMessage = speech.speech.speakMessage
+		_origPackageSpeakMessage = speech.speakMessage
+		speech.speech.speakMessage = _hookedSpeakMessage
+		speech.speakMessage = _hookedSpeakMessage
+
+	def _unpatchSpeakMessage(self) -> None:
+		"""Restores ``speakMessage`` at both levels."""
+		global _origSpeakMessage, _origPackageSpeakMessage
+		if _origSpeakMessage is not None:
+			speech.speech.speakMessage = _origSpeakMessage
+			_origSpeakMessage = None
+		if _origPackageSpeakMessage is not None:
+			speech.speakMessage = _origPackageSpeakMessage
+			_origPackageSpeakMessage = None
 
 	def suppressNextCapture(self) -> None:
 		"""Prevents the next speech sequence from being captured as spoken text."""
