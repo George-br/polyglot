@@ -3,7 +3,6 @@
 import time
 from typing import Any, Callable
 
-import controlTypes
 import speech
 import speech.speech
 import ui
@@ -283,16 +282,11 @@ class SpeechFilter:
 
 		Returns ``(joinedText, indicesIntoSequence)``.
 		"""
-		directMetadata = {
-			_("blank"),
-			controlTypes.State.CLICKABLE.displayString,
-		}
 		pairs = [
 			(i, s)
 			for i, s in enumerate(sequence)
 			if isinstance(s, str)
 			and (not enableSmartFilter or not isinstance(s, _UntranslatableString))
-			and (not enableSmartFilter or isinstance(s, TranslatableString) or s not in directMetadata)
 			and s.strip()
 		]
 		indices = [i for i, _ in pairs]
