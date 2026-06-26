@@ -65,6 +65,7 @@ exclude = [
 	"__pycache__",
 	".venv",
 	"buildVars.py",
+	"addon/websocketClientRepo",
 ]
 
 [tool.ruff.format]
@@ -103,6 +104,7 @@ exclude = [
 	".git",
 	"__pycache__",
 	".venv",
+	"addon/websocketClientRepo",
 	"site_scons",
 	# When excluding concrete paths relative to a directory,
 	# not matching multiple folders by name e.g. `__pycache__`,
