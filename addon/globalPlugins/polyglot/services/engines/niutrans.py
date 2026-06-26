@@ -17,12 +17,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError, EngineEr
 addonHandler.initTranslation()
 
 
-class NiutransApiError(ApiResponseError):
-	"""Custom exception for Niutrans v2.0-specific API errors."""
-
-	pass
-
-
 class NiutransTranslateEngine(BaseHttpEngine):
 	"""
 	An engine for the Niutrans v2.0 API.
@@ -204,12 +198,12 @@ class NiutransTranslateEngine(BaseHttpEngine):
 		try:
 			data = json.loads(responseBody)
 		except json.JSONDecodeError:
-			raise NiutransApiError(_("Failed to parse API response. Response was not valid JSON."))
+			raise ApiResponseError(_("Failed to parse API response. Response was not valid JSON."))
 
 		if "errorCode" in data:
 			errorCode = data.get("errorCode")
 			errorMsg = self.ERROR_CODES.get(errorCode, data.get("errorMsg", "Unknown API error"))
-			raise NiutransApiError(f"{errorMsg} (Code: {errorCode})")
+			raise ApiResponseError(f"{errorMsg} (Code: {errorCode})")
 
 		useBilingualMode = config.get("enableBilingual", False)
 
@@ -244,4 +238,4 @@ class NiutransTranslateEngine(BaseHttpEngine):
 			return {"translation": translatedText.strip(), "langDetected": None}
 		else:
 			log.error(f"Niutrans response missing 'tgtText'. Raw response: {responseBody}")
-			raise NiutransApiError(_("Invalid API response or no translation result included."))
+			raise ApiResponseError(_("Invalid API response or no translation result included."))

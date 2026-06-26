@@ -31,7 +31,6 @@ from .installer import (
 	isFileInUseFailure,
 )
 from .settings import ModelManagerSettings
-from .uiUtils import messageBoxOnMainThread
 
 addonHandler.initTranslation()
 
@@ -256,7 +255,8 @@ class ModelManagerService:
 	def _installPackagesWithUi(self, catalog: ModelCatalog, packages: list[ModelPackage]) -> bool:
 		"""Install packages in the current background task."""
 		if not MODEL_OPERATION_LOCK.acquire(blocking=False):
-			messageBoxOnMainThread(
+			wxCallOnMain(
+				gui.messageBox,
 				_("Another model operation is already running."),
 				_("Polyglot ChromeAI Model Manager"),
 				wx.OK | wx.ICON_INFORMATION,
@@ -286,7 +286,8 @@ class ModelManagerService:
 	def _showInstallFailure(self, error: Exception) -> None:
 		"""Report an on-demand model install failure to the user."""
 		log.error("ChromeAI model install failed.", exc_info=True)
-		messageBoxOnMainThread(
+		wxCallOnMain(
+			gui.messageBox,
 			str(error),
 			_("Polyglot ChromeAI Model Manager"),
 			wx.OK | wx.ICON_ERROR,

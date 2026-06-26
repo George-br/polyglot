@@ -12,12 +12,6 @@ from ...common.exceptions import ApiResponseError
 addonHandler.initTranslation()
 
 
-class LingvaApiError(ApiResponseError):
-	"""Custom exception for Lingva-specific API errors."""
-
-	pass
-
-
 class LingvaTranslateEngine(BaseHttpEngine):
 	"""
 	An engine that uses the Lingva Translate public API.
@@ -83,10 +77,6 @@ class LingvaTranslateEngine(BaseHttpEngine):
 		]
 		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def getConfigSpec(self) -> list[dict]:
-		"""This engine does not require any specific configuration."""
-		return super().getConfigSpec()
-
 	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
 		"""Builds the request dictionary for the Lingva API call."""
 		# The API has a quirk where forward slashes in the text cause issues.
@@ -108,7 +98,7 @@ class LingvaTranslateEngine(BaseHttpEngine):
 			data = json.loads(responseBody)
 		except json.JSONDecodeError:
 			# Sometimes Lingva might return a non-JSON error for very long texts
-			raise LingvaApiError(_("Service returned an invalid result (text may be too long)."))
+			raise ApiResponseError(_("Service returned an invalid result (text may be too long)."))
 
 		translation = data.get("translation")
 
@@ -121,4 +111,4 @@ class LingvaTranslateEngine(BaseHttpEngine):
 			}
 		else:
 			errorInfo = data.get("error", "Unknown API error")
-			raise LingvaApiError(f"{errorInfo}")
+			raise ApiResponseError(f"{errorInfo}")

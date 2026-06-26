@@ -5,24 +5,14 @@ import time
 import urllib.parse
 
 import addonHandler
+import requests
 from logHandler import log
 
 from ...common import languages
 from ..engine import BaseHttpEngine
 from ...common.exceptions import ApiResponseError, AuthenticationError, EngineError
 
-try:
-	import requests
-except ImportError:
-	requests = None
-
 addonHandler.initTranslation()
-
-
-class MicrosoftApiError(ApiResponseError):
-	"""Custom exception for Microsoft Translator API errors."""
-
-	pass
 
 
 class MicrosoftTranslateEngine(BaseHttpEngine):
@@ -77,10 +67,6 @@ class MicrosoftTranslateEngine(BaseHttpEngine):
 		]
 		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def getConfigSpec(self) -> list[dict]:
-		"""This engine does not require any specific configuration."""
-		return super().getConfigSpec()
-
 	def _getAuthToken(self, config: dict) -> str:
 		"""
 		Fetches or returns a cached authentication token from Microsoft's auth service.
@@ -89,9 +75,6 @@ class MicrosoftTranslateEngine(BaseHttpEngine):
 		# Check if we have a valid, non-expired token
 		if self._tokenCache["token"] and self._tokenCache["expiry"] > time.time():
 			return self._tokenCache["token"]
-
-		if not requests:
-			raise EngineError("The 'requests' library is required for this engine.")
 
 		log.info("Microsoft Translator: Fetching new authentication token.")
 		url = "https://edge.microsoft.com/translate/auth"
@@ -155,7 +138,7 @@ class MicrosoftTranslateEngine(BaseHttpEngine):
 				self._tokenCache["token"] = None
 				self._tokenCache["expiry"] = 0
 			# Re-raise as our custom exception type
-			raise MicrosoftApiError(f"HTTP Error: {e.response.status_code}") from e
+			raise ApiResponseError(f"HTTP Error: {e.response.status_code}") from e
 		except Exception as e:
 			log.error(f"An unexpected error occurred in '{self.id}' engine.", exc_info=True)
 			if isinstance(e, (ApiResponseError, EngineError)):
@@ -199,7 +182,7 @@ class MicrosoftTranslateEngine(BaseHttpEngine):
 		try:
 			data = json.loads(responseBody)
 		except json.JSONDecodeError:
-			raise MicrosoftApiError(_("Failed to parse response from Microsoft Translator."))
+			raise ApiResponseError(_("Failed to parse response from Microsoft Translator."))
 
 		try:
 			# The response is a list of translation results
@@ -217,7 +200,7 @@ class MicrosoftTranslateEngine(BaseHttpEngine):
 		except (KeyError, IndexError, TypeError):
 			if "error" in data:
 				errorMsg = data["error"].get("message", "Unknown API error")
-				raise MicrosoftApiError(errorMsg)
+				raise ApiResponseError(errorMsg)
 
 			log.error(f"Could not parse Microsoft Translator response. Raw: {responseBody}")
-			raise MicrosoftApiError(_("Invalid API response or no translation result included."))
+			raise ApiResponseError(_("Invalid API response or no translation result included."))

@@ -12,10 +12,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError, EngineEr
 addonHandler.initTranslation()
 
 
-class TencentWebApiError(ApiResponseError):
-	pass
-
-
 class TencentWebTranslateEngine(BaseHttpEngine):
 	id = "tencentPolyglot"
 	name = _("Tencent Translate (Polyglot)")
@@ -88,7 +84,7 @@ class TencentWebTranslateEngine(BaseHttpEngine):
 				detectedLang = data.get("langDetected")
 				return {"translation": translatedText, "langDetected": detectedLang}
 			else:
-				raise TencentWebApiError(
+				raise ApiResponseError(
 					_("API response successful but did not contain a translation result."),
 				)
 		else:
@@ -97,4 +93,4 @@ class TencentWebTranslateEngine(BaseHttpEngine):
 			if errorCode in (401, 403):
 				# Translators: Error message when authentication with the translation service fails. {error} is the detailed error description.
 				raise EngineError(_("Authentication failed: {error}").format(error=errorMessage))
-			raise TencentWebApiError(f"{errorMessage} (Code: {errorCode or 'N/A'})")
+			raise ApiResponseError(f"{errorMessage} (Code: {errorCode or 'N/A'})")

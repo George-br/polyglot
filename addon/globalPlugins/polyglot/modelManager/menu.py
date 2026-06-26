@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any
 
 import addonHandler
 import gui
@@ -17,13 +17,6 @@ import wx
 from .dialog import ModelManagerDialog
 
 addonHandler.initTranslation()
-
-
-class _MenuHandler(Protocol):
-	"""Protocol for objects that handle model manager menu commands."""
-
-	def onOpenModelManager(self, event: wx.CommandEvent) -> None:
-		"""Handle the Tools menu command."""
 
 
 _dialog: ModelManagerDialog | None = None
@@ -68,7 +61,7 @@ def closeModelManagerDialog() -> None:
 		_dialog = None
 
 
-def bindToolsMenu(handler: _MenuHandler) -> wx.MenuItem:
+def bindToolsMenu(handler: Any) -> wx.MenuItem:
 	"""Create the Tools menu item for opening the model manager."""
 	item = gui.mainFrame.sysTrayIcon.toolsMenu.Append(
 		wx.ID_ANY,

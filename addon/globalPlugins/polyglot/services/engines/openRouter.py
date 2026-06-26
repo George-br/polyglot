@@ -22,11 +22,6 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 	id = "openrouter"
 	name = _("OpenRouter")
 
-	class OpenRouterApiError(ApiResponseError):
-		"""Custom exception for OpenRouter-specific API errors."""
-
-		pass
-
 	# Predefined prompt templates
 	PROMPT_JSON_STRUCTURED_SYSTEM = "You are an AI assistant that follows instructions precisely. Your response format must be a valid JSON object."
 	PROMPT_JSON_STRUCTURED_USER = 'Task: First, identify the source language of the text. Then, translate the text to $to_name.\nResponse: Reply with a JSON object containing two keys: "detected_language" (the IETF code of the source language) and "translation" (the translated text).\n\nText to process:\n"""\n$text\n"""'
@@ -222,11 +217,11 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 			outerData = json.loads(responseBody)
 		except json.JSONDecodeError as e:
 			log.error(f"Failed to parse outer JSON response from '{self.id}'.", exc_info=True)
-			raise self.OpenRouterApiError(_("Failed to parse API response.")) from e
+			raise ApiResponseError(_("Failed to parse API response.")) from e
 
 		if "error" in outerData:
 			errorMessage = outerData["error"].get("message", "Unknown API error")
-			raise self.OpenRouterApiError(errorMessage)
+			raise ApiResponseError(errorMessage)
 
 		try:
 			modelResponseStr = outerData["choices"][0]["message"]["content"]
@@ -266,4 +261,4 @@ class OpenRouterTranslateEngine(BaseHttpEngine):
 			return {"translation": modelResponseStr.strip(), "langDetected": None}
 		except (KeyError, IndexError) as e:
 			log.error(f"Could not extract message content from '{self.id}' response.", exc_info=True)
-			raise self.OpenRouterApiError(_("Invalid API response structure.")) from e
+			raise ApiResponseError(_("Invalid API response structure.")) from e

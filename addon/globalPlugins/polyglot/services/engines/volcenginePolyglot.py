@@ -12,10 +12,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError, EngineEr
 addonHandler.initTranslation()
 
 
-class VolcengineApiError(ApiResponseError):
-	pass
-
-
 class VolcengineTranslateEngine(BaseHttpEngine):
 	id = "volcenginePolyglot"
 	name = _("Volcengine (Polyglot)")
@@ -96,7 +92,7 @@ class VolcengineTranslateEngine(BaseHttpEngine):
 				detectedLang = data.get("langDetected")
 				return {"translation": translatedText, "langDetected": detectedLang}
 			else:
-				raise VolcengineApiError(
+				raise ApiResponseError(
 					_("API response successful but did not contain a translation result."),
 				)
 		else:
@@ -105,4 +101,4 @@ class VolcengineTranslateEngine(BaseHttpEngine):
 			if errorCode in (401, 403):
 				# Translators: Error message when authentication with the translation service fails. {error} is the detailed error description.
 				raise EngineError(_("Authentication failed: {error}").format(error=errorMessage))
-			raise VolcengineApiError(f"{errorMessage} (Code: {errorCode or 'N/A'})")
+			raise ApiResponseError(f"{errorMessage} (Code: {errorCode or 'N/A'})")

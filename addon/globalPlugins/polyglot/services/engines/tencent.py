@@ -16,10 +16,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError
 addonHandler.initTranslation()
 
 
-class TencentApiError(ApiResponseError):
-	pass
-
-
 class TencentTranslateEngine(BaseHttpEngine):
 	id = "tencent"
 	name = _("Tencent Translate")
@@ -171,12 +167,12 @@ class TencentTranslateEngine(BaseHttpEngine):
 					f"{_('Authentication failed')}: {errorMessage} (Code: {errorCode})",
 				)
 			else:
-				raise TencentApiError(f"{errorMessage} (Code: {errorCode})")
+				raise ApiResponseError(f"{errorMessage} (Code: {errorCode})")
 
 		translatedText = response.get("TargetText")
 		detectedLang = response.get("Source")
 
 		if translatedText is None:
-			raise TencentApiError(_("Invalid API response or no translation result included."))
+			raise ApiResponseError(_("Invalid API response or no translation result included."))
 
 		return {"translation": translatedText, "langDetected": detectedLang}

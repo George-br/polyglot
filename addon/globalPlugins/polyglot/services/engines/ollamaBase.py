@@ -13,12 +13,6 @@ from ..engine import BaseHttpEngine
 addonHandler.initTranslation()
 
 
-class OllamaApiError(ApiResponseError):
-	"""Custom exception for Ollama-specific API errors."""
-
-	pass
-
-
 class OllamaBaseEngine(BaseHttpEngine):
 	"""
 	This is the BASE implementation for all Ollama engines.
@@ -179,12 +173,12 @@ class OllamaBaseEngine(BaseHttpEngine):
 		outerData = json.loads(responseBody)
 
 		if "error" in outerData:
-			raise OllamaApiError(outerData["error"])
+			raise ApiResponseError(outerData["error"])
 
 		modelResponseStr = outerData.get("response")
 
 		if not modelResponseStr:
-			raise OllamaApiError(_("API response did not contain a 'response' field."))
+			raise ApiResponseError(_("API response did not contain a 'response' field."))
 
 		try:
 			cleanStr = modelResponseStr.strip()

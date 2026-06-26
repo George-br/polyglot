@@ -14,10 +14,6 @@ from ...common.exceptions import EngineError
 addonHandler.initTranslation()
 
 
-class BaiduApiError(EngineError):
-	pass
-
-
 class BaiduTranslateEngine(BaseHttpEngine):
 	id = "baidu"
 	name = _("Baidu Translate")
@@ -113,7 +109,7 @@ class BaiduTranslateEngine(BaseHttpEngine):
 		appId = config.get("appId")
 		appSecret = config.get("appSecret")
 		if not appId or not appSecret:
-			raise BaiduApiError(_("App ID and App Secret are required."))
+			raise EngineError(_("App ID and App Secret are required."))
 
 		salt = random.randint(32768, 65536)
 		sign = self._makeSign(text, salt, appId, appSecret)
@@ -142,7 +138,7 @@ class BaiduTranslateEngine(BaseHttpEngine):
 		if "error_code" in result:
 			errorCode = result["error_code"]
 			message = self.ERROR_CODES.get(errorCode, result.get("error_msg", _("Unknown API error")))
-			raise BaiduApiError(f"{message} (Code: {errorCode})")
+			raise EngineError(f"{message} (Code: {errorCode})")
 
 		translatedText = "\n".join(item["dst"] for item in result["trans_result"])
 		detectedLang = result.get("from")

@@ -12,10 +12,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError
 addonHandler.initTranslation()
 
 
-class DeepLApiError(ApiResponseError):
-	pass
-
-
 class DeepLEngine(BaseHttpEngine):
 	id = "deepl"
 	name = _("DeepL")
@@ -180,7 +176,7 @@ class DeepLEngine(BaseHttpEngine):
 	def _parseResponse(self, responseBody: str) -> dict:
 		data = json.loads(responseBody)
 		if "message" in data:
-			raise DeepLApiError(data["message"])
+			raise ApiResponseError(data["message"])
 		if not data.get("translations"):
 			raise ApiResponseError(_("Invalid API response or no translation result included."))
 

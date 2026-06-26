@@ -13,10 +13,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError
 addonHandler.initTranslation()
 
 
-class GoogleHQApiError(ApiResponseError):
-	pass
-
-
 class GoogleHQTranslateEngine(BaseHttpEngine):
 	id = "googlePolyglot"
 	name = _("Google Translate (Polyglot)")
@@ -195,16 +191,16 @@ class GoogleHQTranslateEngine(BaseHttpEngine):
 		try:
 			data = json.loads(responseBody)
 		except json.JSONDecodeError:
-			raise GoogleHQApiError(_("Failed to parse API response."))
+			raise ApiResponseError(_("Failed to parse API response."))
 		try:
 			rawTranslatedText = data[0][0]
 			translatedText = html.unescape(rawTranslatedText)
 		except (IndexError, TypeError):
 			if isinstance(data, dict) and "error" in data:
 				errorMsg = data["error"].get("message", "Unknown API error")
-				raise GoogleHQApiError(errorMsg)
+				raise ApiResponseError(errorMsg)
 			log.error(f"Could not parse Google HQ response. Raw: {responseBody}")
-			raise GoogleHQApiError(_("Invalid API response or no translation text included."))
+			raise ApiResponseError(_("Invalid API response or no translation text included."))
 		detectedLang = None
 		if len(data) > 1 and isinstance(data[1], list) and data[1]:
 			detectedLang = data[1][0]

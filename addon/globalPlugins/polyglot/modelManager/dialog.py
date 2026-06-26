@@ -19,6 +19,7 @@ import addonHandler
 import gui
 import wx
 from gui import nvdaControls
+from gui.guiHelper import wxCallOnMain
 from logHandler import log
 
 from .catalog import (
@@ -37,7 +38,6 @@ from .installer import (
 	isFileInUseFailure,
 )
 from .settings import ModelManagerSettings
-from .uiUtils import messageBoxOnMainThread
 
 addonHandler.initTranslation()
 
@@ -377,7 +377,8 @@ class ModelManagerDialog(nvdaControls.DPIScaledDialog):
 			cacheBytes = self.installer.getDownloadCacheSize()
 			if cacheBytes == 0:
 				return "empty", 0.0
-			answer = messageBoxOnMainThread(
+			answer = wxCallOnMain(
+				gui.messageBox,
 				_(
 					"This will delete {size:.1f} MiB of temporary and legacy cached downloads. "
 					"Installed models will not be removed.\n\nContinue?",

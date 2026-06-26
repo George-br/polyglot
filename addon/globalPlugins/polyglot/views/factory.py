@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
@@ -13,36 +12,30 @@ ConfigSpec = dict[str, Any]
 ConfigSection = dict[str, Any]
 
 
-class ControlHandlerBase(ABC):
+class ControlHandlerBase:
 	@property
-	@abstractmethod
 	def configType(self) -> str:
-		pass
+		raise NotImplementedError
 
-	@abstractmethod
 	def formatConfigDefault(self, value: Any) -> str:
-		pass
+		raise NotImplementedError
 
-	@abstractmethod
 	def createControlPair(
 		self,
 		panel: wx.Window,
 		spec: ConfigSpec,
 	) -> tuple[wx.StaticText | None, wx.Control]:
-		pass
+		raise NotImplementedError
 
-	@abstractmethod
 	def getValueFromControl(self, control: wx.Control) -> Any:
-		pass
+		raise NotImplementedError
 
-	@abstractmethod
 	def setValueToControl(self, control: wx.Control, value: Any, spec: ConfigSpec):
-		pass
+		raise NotImplementedError
 
-	@abstractmethod
 	def bindEvent(self, control: wx.Control, callback: Callable[[wx.Event], None]):
 		"""Binds the appropriate 'value changed' event to the control."""
-		pass
+		raise NotImplementedError
 
 	def updateControlState(
 		self,
@@ -63,40 +56,22 @@ class ControlHandlerBase(ABC):
 				if labelControl:
 					labelControl.Show(bool(value))
 
-	@abstractmethod
 	def loadFromConfig(self, control: wx.Control, configSection: ConfigSection, spec: ConfigSpec):
 		"""Loads a value from the config dictionary and applies it to the control."""
-		pass
+		raise NotImplementedError
 
-	@abstractmethod
 	def saveToConfig(self, control: wx.Control, configSection: ConfigSection, spec: ConfigSpec):
 		"""Gets the value from the control and saves it to the config dictionary."""
-		pass
-
-
-_controlRegistry: dict[str, ControlHandlerBase] = {}
-
-
-def registerControl(typeName: str) -> Callable[[type[ControlHandlerBase]], type[ControlHandlerBase]]:
-	"""Class decorator that registers a control handler for the given config type name."""
-
-	def decorator(cls: type[ControlHandlerBase]) -> type[ControlHandlerBase]:
-		if typeName in _controlRegistry:
-			raise ValueError(f"Control type '{typeName}' is already registered.")
-		_controlRegistry[typeName] = cls()
-		return cls
-
-	return decorator
+		raise NotImplementedError
 
 
 def getControlHandler(typeName: str) -> ControlHandlerBase:
 	"""Returns the registered control handler for the given config type name."""
-	if typeName not in _controlRegistry:
+	if typeName not in _controlHandlers:
 		raise ValueError(f"Unknown control type: '{typeName}'")
-	return _controlRegistry[typeName]
+	return _controlHandlers[typeName]
 
 
-@registerControl("checkbox")
 class CheckboxHandler(ControlHandlerBase):
 	@property
 	def configType(self) -> str:
@@ -135,7 +110,7 @@ class CheckboxHandler(ControlHandlerBase):
 		configSection[spec["id"]] = self.getValueFromControl(control)
 
 
-class LabeledControlHandler(ControlHandlerBase, ABC):
+class LabeledControlHandler(ControlHandlerBase):
 	def createControlPair(
 		self,
 		panel: wx.Window,
@@ -146,13 +121,10 @@ class LabeledControlHandler(ControlHandlerBase, ABC):
 		control = wxClass(panel, **kwargs)
 		return (label, control)
 
-	@abstractmethod
 	def getWxClassAndKwargs(self, spec: ConfigSpec) -> tuple[type[wx.Control], dict[str, Any]]:
-		pass
+		raise NotImplementedError
 
 
-@registerControl("text")
-@registerControl("password")
 class TextHandler(LabeledControlHandler):
 	@property
 	def configType(self) -> str:
@@ -187,7 +159,6 @@ class TextHandler(LabeledControlHandler):
 		configSection[spec["id"]] = self.getValueFromControl(control)
 
 
-@registerControl("choice")
 class ChoiceHandler(LabeledControlHandler):
 	@property
 	def configType(self) -> str:
@@ -274,7 +245,6 @@ class ChoiceHandler(LabeledControlHandler):
 		configSection[spec["id"]] = self.getValueFromControl(control)
 
 
-@registerControl("spinctrl")
 class SpinCtrlHandler(LabeledControlHandler):
 	@property
 	def configType(self) -> str:
@@ -318,3 +288,12 @@ class SpinCtrlHandler(LabeledControlHandler):
 	def saveToConfig(self, control: wx.Control, configSection: ConfigSection, spec: ConfigSpec) -> None:
 		assert isinstance(control, wx.SpinCtrl)
 		configSection[spec["id"]] = self.getValueFromControl(control)
+
+
+_controlHandlers: dict[str, ControlHandlerBase] = {
+	"checkbox": CheckboxHandler(),
+	"text": TextHandler(),
+	"password": TextHandler(),
+	"choice": ChoiceHandler(),
+	"spinctrl": SpinCtrlHandler(),
+}

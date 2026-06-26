@@ -11,12 +11,6 @@ from ...common.exceptions import ApiResponseError, AuthenticationError
 addonHandler.initTranslation()
 
 
-class CaiyunApiError(ApiResponseError):
-	"""Custom exception for Caiyun-specific API errors."""
-
-	pass
-
-
 class CaiyunTranslateEngine(BaseHttpEngine):
 	"""
 	An engine for Caiyun AI Translation.
@@ -92,7 +86,7 @@ class CaiyunTranslateEngine(BaseHttpEngine):
 
 		# Check for business logic errors first
 		if "message" in data:
-			raise CaiyunApiError(data["message"])
+			raise ApiResponseError(data["message"])
 		translatedList = data.get("target")
 		if translatedList and isinstance(translatedList, list) and translatedList[0] is not None:
 			detectedLang = None
@@ -104,4 +98,4 @@ class CaiyunTranslateEngine(BaseHttpEngine):
 
 			return {"translation": translatedList[0], "langDetected": detectedLang}
 		else:
-			raise CaiyunApiError(_("Invalid API response or no translation result included."))
+			raise ApiResponseError(_("Invalid API response or no translation result included."))

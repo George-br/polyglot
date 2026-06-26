@@ -13,12 +13,6 @@ from ...common.exceptions import ApiResponseError
 addonHandler.initTranslation()
 
 
-class YandexApiError(ApiResponseError):
-	"""Custom exception for Yandex-specific API errors."""
-
-	pass
-
-
 class YandexTranslateEngine(BaseHttpEngine):
 	"""
 	An engine that uses the public Yandex Translate API.
@@ -81,10 +75,6 @@ class YandexTranslateEngine(BaseHttpEngine):
 		]
 		return languages.getLanguageDictForCodes(supportedCodes)
 
-	def getConfigSpec(self) -> list[dict]:
-		"""This engine does not require any specific configuration."""
-		return super().getConfigSpec()
-
 	def _buildRequestParams(self, text: str, langFrom: str, langTo: str, config: dict) -> dict:
 		"""Builds the request dictionary for the Yandex API call."""
 		baseUrl = "https://translate.yandex.net/api/v1/tr.json/translate"
@@ -126,5 +116,5 @@ class YandexTranslateEngine(BaseHttpEngine):
 			errorCode = data.get("code")
 			errorMessage = data.get("message", "Unknown API error")
 			if errorCode:
-				raise YandexApiError(f"{errorMessage} (Code: {errorCode})")
-			raise YandexApiError(_("Invalid API response or no translation result included."))
+				raise ApiResponseError(f"{errorMessage} (Code: {errorCode})")
+			raise ApiResponseError(_("Invalid API response or no translation result included."))
