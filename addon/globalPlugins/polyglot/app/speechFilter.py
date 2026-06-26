@@ -52,6 +52,8 @@ _origGetSpellingSpeech: Callable | None = None
 _origPackageGetSpellingSpeech: Callable | None = None
 _origSpeakTypedCharacters: Callable | None = None
 _origPackageSpeakTypedCharacters: Callable | None = None
+_origSpeakText: Callable | None = None
+_origPackageSpeakText: Callable | None = None
 _origGetSelectionMessageSpeech: Callable | None = None
 _origPackageGetSelectionMessageSpeech: Callable | None = None
 _origGetIndentationSpeech: Callable | None = None
@@ -128,6 +130,25 @@ def _hookedSpeakTypedCharacters(ch: str) -> None:
 		_suppressAutoTranslationDepth -= 1
 
 
+def _hookedSpeakText(
+	text: str,
+	reason=speech.speech.OutputReason.MESSAGE,
+	symbolLevel=None,
+	priority=None,
+) -> None:
+	"""Speaks blank text reports as metadata while preserving real text."""
+	if speech.speech.isBlank(text):
+		sequence = speech.speech._getSpeakMessageSpeech(text)
+		if sequence:
+			speech.speech.speak(
+				_markStringsUntranslatable(sequence),
+				symbolLevel=symbolLevel,
+				priority=priority,
+			)
+		return
+	_origSpeakText(text, reason=reason, symbolLevel=symbolLevel, priority=priority)
+
+
 def _hookedGetSelectionMessageSpeech(message: str, text: str | list[Any]) -> list[Any]:
 	"""Marks selection prefixes/suffixes as metadata while preserving selected text."""
 	prefix, sep, suffix = message.partition("%s")
@@ -184,6 +205,7 @@ class SpeechFilter:
 		self._patchGetControlFieldSpeech()
 		self._patchGetSpellingSpeech()
 		self._patchSpeakTypedCharacters()
+		self._patchSpeakText()
 		self._patchGetSelectionMessageSpeech()
 		self._patchGetIndentationSpeech()
 
@@ -191,6 +213,7 @@ class SpeechFilter:
 		"""Unregisters the speech filter, cue suppression hook, and restores speech hooks."""
 		self._unpatchGetIndentationSpeech()
 		self._unpatchGetSelectionMessageSpeech()
+		self._unpatchSpeakText()
 		self._unpatchSpeakTypedCharacters()
 		self._unpatchGetSpellingSpeech()
 		self._unpatchGetControlFieldSpeech()
@@ -285,6 +308,24 @@ class SpeechFilter:
 		if _origPackageSpeakTypedCharacters is not None:
 			speech.speakTypedCharacters = _origPackageSpeakTypedCharacters
 			_origPackageSpeakTypedCharacters = None
+
+	def _patchSpeakText(self) -> None:
+		"""Patches blank ``speakText`` reports so they are not translated."""
+		global _origSpeakText, _origPackageSpeakText
+		_origSpeakText = speech.speech.speakText
+		_origPackageSpeakText = speech.speakText
+		speech.speech.speakText = _hookedSpeakText
+		speech.speakText = _hookedSpeakText
+
+	def _unpatchSpeakText(self) -> None:
+		"""Restores ``speakText`` at both levels."""
+		global _origSpeakText, _origPackageSpeakText
+		if _origSpeakText is not None:
+			speech.speech.speakText = _origSpeakText
+			_origSpeakText = None
+		if _origPackageSpeakText is not None:
+			speech.speakText = _origPackageSpeakText
+			_origPackageSpeakText = None
 
 	def _patchGetSelectionMessageSpeech(self) -> None:
 		"""Patches selection speech so only selected text is translated."""
