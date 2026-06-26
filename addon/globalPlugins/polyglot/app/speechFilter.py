@@ -3,6 +3,7 @@
 import time
 from typing import Any, Callable
 
+import controlTypes
 import speech
 import speech.speech
 import ui
@@ -50,6 +51,10 @@ _origGetFormatFieldSpeech: Callable | None = None
 _origGetControlFieldSpeech: Callable | None = None
 _origSpeakMessage: Callable | None = None
 _origPackageSpeakMessage: Callable | None = None
+_origGetSelectionMessageSpeech: Callable | None = None
+_origPackageGetSelectionMessageSpeech: Callable | None = None
+_origGetIndentationSpeech: Callable | None = None
+_origPackageGetIndentationSpeech: Callable | None = None
 
 
 def _markStringsUntranslatable(sequence: list[Any]) -> list[Any]:
@@ -107,6 +112,37 @@ def _hookedSpeakMessage(text: str, priority=None) -> None:
 		speech.speech.speak(_markStringsUntranslatable(sequence), symbolLevel=None, priority=priority)
 
 
+def _hookedGetSelectionMessageSpeech(message: str, text: str | list[Any]) -> list[Any]:
+	"""Marks selection prefixes/suffixes as metadata while preserving selected text."""
+	prefix, sep, suffix = message.partition("%s")
+	if isinstance(text, list):
+		if not sep:
+			return _markStringsUntranslatable(speech.speech._getSpeakMessageSpeech(message)) + text
+		sequence = list(text)
+		if prefix:
+			sequence.insert(0, _UntranslatableString(prefix))
+		if suffix:
+			sequence.append(_UntranslatableString(suffix))
+		return sequence
+
+	if not sep or len(text) >= speech.speech.MAX_LENGTH_FOR_SELECTION_REPORTING:
+		return _markStringsUntranslatable(_origGetSelectionMessageSpeech(message, text))
+
+	sequence: list[Any] = []
+	if prefix:
+		sequence.append(_UntranslatableString(prefix))
+	if text:
+		sequence.append(TranslatableString(text))
+	if suffix:
+		sequence.append(_UntranslatableString(suffix))
+	return sequence
+
+
+def _hookedGetIndentationSpeech(indentation: str, formatConfig: dict[str, Any]) -> list[Any]:
+	"""Marks indentation reports as metadata."""
+	return _markStringsUntranslatable(_origGetIndentationSpeech(indentation, formatConfig))
+
+
 class SpeechFilter:
 	# Annotate instance variables at the class level
 	manager: TranslationManager
@@ -131,9 +167,13 @@ class SpeechFilter:
 		self._patchGetFormatFieldSpeech()
 		self._patchGetControlFieldSpeech()
 		self._patchSpeakMessage()
+		self._patchGetSelectionMessageSpeech()
+		self._patchGetIndentationSpeech()
 
 	def unregister(self) -> None:
 		"""Unregisters the speech filter, cue suppression hook, and restores speech hooks."""
+		self._unpatchGetIndentationSpeech()
+		self._unpatchGetSelectionMessageSpeech()
 		self._unpatchSpeakMessage()
 		self._unpatchGetControlFieldSpeech()
 		self._unpatchGetFormatFieldSpeech()
@@ -210,6 +250,42 @@ class SpeechFilter:
 			speech.speakMessage = _origPackageSpeakMessage
 			_origPackageSpeakMessage = None
 
+	def _patchGetSelectionMessageSpeech(self) -> None:
+		"""Patches selection speech so only selected text is translated."""
+		global _origGetSelectionMessageSpeech, _origPackageGetSelectionMessageSpeech
+		_origGetSelectionMessageSpeech = speech.speech._getSelectionMessageSpeech
+		_origPackageGetSelectionMessageSpeech = speech._getSelectionMessageSpeech
+		speech.speech._getSelectionMessageSpeech = _hookedGetSelectionMessageSpeech
+		speech._getSelectionMessageSpeech = _hookedGetSelectionMessageSpeech
+
+	def _unpatchGetSelectionMessageSpeech(self) -> None:
+		"""Restores ``_getSelectionMessageSpeech`` at both levels."""
+		global _origGetSelectionMessageSpeech, _origPackageGetSelectionMessageSpeech
+		if _origGetSelectionMessageSpeech is not None:
+			speech.speech._getSelectionMessageSpeech = _origGetSelectionMessageSpeech
+			_origGetSelectionMessageSpeech = None
+		if _origPackageGetSelectionMessageSpeech is not None:
+			speech._getSelectionMessageSpeech = _origPackageGetSelectionMessageSpeech
+			_origPackageGetSelectionMessageSpeech = None
+
+	def _patchGetIndentationSpeech(self) -> None:
+		"""Patches indentation speech so indentation reports are not translated."""
+		global _origGetIndentationSpeech, _origPackageGetIndentationSpeech
+		_origGetIndentationSpeech = speech.speech.getIndentationSpeech
+		_origPackageGetIndentationSpeech = speech.getIndentationSpeech
+		speech.speech.getIndentationSpeech = _hookedGetIndentationSpeech
+		speech.getIndentationSpeech = _hookedGetIndentationSpeech
+
+	def _unpatchGetIndentationSpeech(self) -> None:
+		"""Restores ``getIndentationSpeech`` at both levels."""
+		global _origGetIndentationSpeech, _origPackageGetIndentationSpeech
+		if _origGetIndentationSpeech is not None:
+			speech.speech.getIndentationSpeech = _origGetIndentationSpeech
+			_origGetIndentationSpeech = None
+		if _origPackageGetIndentationSpeech is not None:
+			speech.getIndentationSpeech = _origPackageGetIndentationSpeech
+			_origPackageGetIndentationSpeech = None
+
 	def suppressNextCapture(self) -> None:
 		"""Prevents the next speech sequence from being captured as spoken text."""
 		self._suppressCapture += 1
@@ -236,11 +312,16 @@ class SpeechFilter:
 
 		Returns ``(joinedText, indicesIntoSequence)``.
 		"""
+		directMetadata = {
+			_("blank"),
+			controlTypes.State.CLICKABLE.displayString,
+		}
 		pairs = [
 			(i, s)
 			for i, s in enumerate(sequence)
 			if isinstance(s, str)
 			and (not enableSmartFilter or not isinstance(s, _UntranslatableString))
+			and (not enableSmartFilter or isinstance(s, TranslatableString) or s not in directMetadata)
 			and s.strip()
 		]
 		indices = [i for i, _ in pairs]
