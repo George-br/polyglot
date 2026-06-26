@@ -35,7 +35,15 @@ class _UntranslatableString(str):
 
 
 # Keys in ``getPropertiesSpeech`` kwargs that carry user content.
-_TRANSLATABLE_KEYS = ("name", "value", "description", "rowHeaderText", "columnHeaderText")
+_TRANSLATABLE_KEYS = (
+	"name",
+	"value",
+	"description",
+	"rowHeaderText",
+	"columnHeaderText",
+	"placeholder",
+	"errorMessage",
+)
 
 _origGetPropertiesSpeech: Callable | None = None
 _origGetFormatFieldSpeech: Callable | None = None
